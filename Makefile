@@ -10,7 +10,7 @@ endif
 SRC= load-test.cpp parser.cpp utils.cpp
 LDFLAGS= -lpthread -lrt
 
-PROJECT_ROOT_DIR= /home/ntollena/cache_bench
+PROJECT_ROOT_DIR= $(shell pwd)
 
 DEBUG_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(SRC:.cpp=.o))
 RELEASE_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(SRC:.cpp=.o))
