@@ -8,9 +8,9 @@ else
 	EXEC= load
 endif
 SRC= load-test.cpp parser.cpp utils.cpp
-LDFLAGS= -lpthread
+LDFLAGS= -lpthread -lrt
 
-PROJECT_ROOT_DIR= /home/nico/stage/cache-work
+PROJECT_ROOT_DIR= /home/ntollena/cache_bench
 
 DEBUG_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(SRC:.cpp=.o))
 RELEASE_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(SRC:.cpp=.o))
