@@ -7,3 +7,5 @@ testdir/*
 
 load
 load.db
+
+.depend
