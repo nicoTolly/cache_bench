@@ -3,22 +3,42 @@
 using namespace std;
 
 
-ThrParam::ThrParam():nbThread(NCORES_PER_NODE),nbSlow(0),close(true), slwThrList(NULL)
+ThrParam::ThrParam():nbSlow(0),close(true), slwThrList(NULL)
 {
+	int res;
+
+	if((res = getCpuPerNode()) < 0)
+		nbPUNode = NCORES_PER_NODE;
+	else
+		nbPUNode = res;
+	nbThread = nbPUNode;
 	this->fstThrList = new int[NCORES_PER_NODE] ;
-	for(int i = 0; i < NCORES_PER_NODE; i++)
+	for(int i = 0; i < nbPUNode; i++)
 		this->fstThrList[i] = i;
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw):nbThread(nbT),nbSlow(nbSlw),close(true)
+ThrParam::ThrParam(int nbT, int nbSlw):nbSlow(nbSlw),close(true)
 {
+	int res;
+
+	if((res = getCpuPerNode()) < 0)
+		nbPUNode = NCORES_PER_NODE;
+	else
+		nbPUNode = res;
+
+	// setting default nb thread if 
+	// it is not passed in parameter
+	if (nbT == -1)
+		nbThread = nbPUNode;
+	else
+		nbThread = nbT;
 	if (nbSlw == nbT)
 	{
 		this->fstThrList = NULL;
 		this->slwThrList = new int[nbSlw];
 		for(int i = 0; i < nbThread; i++)
 			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
-			this->slwThrList[i] = i % NCORES_PER_NODE;
+			this->slwThrList[i] = i % nbPUNode;
 	}
 	else
 	{
@@ -28,28 +48,37 @@ ThrParam::ThrParam(int nbT, int nbSlw):nbThread(nbT),nbSlow(nbSlw),close(true)
 		int i=0, j=0;
 		for(; i < nbFst; i++)
 		{
-			this->fstThrList[i]= i % NCORES_PER_NODE;
+			this->fstThrList[i]= i % nbPUNode;
 		}
-		printf("i = %d\n", i);
 		for(; j < nbSlw; i++, j++)
 		{
-			printf("slow thread %d placed on cpu %d\n", j, i % NCORES_PER_NODE);
-			this->slwThrList[j]= i % NCORES_PER_NODE;
+			printf("slow thread %d placed on cpu %d\n", j, i % nbPUNode);
+			this->slwThrList[j]= i % nbPUNode;
 		}
 
 	}
 
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbThread(nbT),nbSlow(nbSlw), close(close)
+ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
 {
-	if (nbSlw == nbT)
+	int res;
+
+	if((res = getCpuPerNode()) < 0)
+		nbPUNode = NCORES_PER_NODE;
+	else
+		nbPUNode = res;
+	if (nbT == -1)
+		nbThread = nbPUNode;
+	else
+		nbThread = nbT;
+	if (nbSlw == nbThread)
 	{
 		this->fstThrList = NULL;
 		this->slwThrList = new int[nbSlw];
 		for(int i = 0; i < nbThread; i++)
 			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
-			this->slwThrList[i] = i % NCORES_PER_NODE;
+			this->slwThrList[i] = i % nbPUNode;
 	}
 	else if(close)
 		//case we want to place every
@@ -61,11 +90,11 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbThread(nbT),nbSlow(nbSlw), 
 		int i=0, j=0;
 		for(; i < nbFst; i++)
 		{
-			this->fstThrList[i]= i % NCORES_PER_NODE;
+			this->fstThrList[i]= i % nbPUNode;
 		}
 		for(; j < nbSlw; i++, j++)
 		{
-			this->slwThrList[j]=  i % NCORES_PER_NODE;
+			this->slwThrList[j]=  i % nbPUNode;
 		}
 	}
 	else
@@ -76,13 +105,35 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbThread(nbT),nbSlow(nbSlw), 
 		int i=0, j=0;
 		for(; i < nbFst; i++)
 		{
-			this->fstThrList[i]= i % NCORES_PER_NODE;
+			this->fstThrList[i]= i % nbPUNode;
 		}
 		for(; j < nbSlw; j++)
 		{
-			this->slwThrList[j]= NCORES_PER_NODE + j % NCORES_PER_NODE;
+			this->slwThrList[j]= nbPUNode + j % nbPUNode;
 		}
 	}
+}
+
+void ThrParam::info()
+{
+		int nbFst = nbThread - nbSlow;
+		cout << nbThread << " threads to be launched" << endl;
+		if (nbFst > 0)
+		{
+			printf("Lauching %d fast threads\n", nbFst);
+			for(int i = 0; i < nbFst; i++)
+			{
+				printf("fast thread %d will run on cpu %d \n",i, this->fstThrList[i]);
+			}
+		}
+		if (this->nbSlow > 0)
+		{
+			printf("Lauching %d slow threads\n", nbSlow);
+			for(int i = 0; i < nbSlow; i++)
+			{
+				printf("slow thread %d will run on cpu %d \n",i, this->slwThrList[i]);
+			}
+		}
 }
 
 ThrParam::~ThrParam()
@@ -98,10 +149,12 @@ ThrParam::~ThrParam()
 // function for parsing main arguments
 int parseArg(int argc, char * args[], ThrParam **param)
 {
-	int nbThread=NCORES_PER_NODE, nbSlow=0;
+	int nbThread=-1, nbSlow=0;
 	bool close=true;
 	int * fstThr;
 	int * slwThr;
+
+
 
 	string arr[argc -1];
 	for(int i = 1; i < argc; i++)
@@ -144,7 +197,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 
 	}
 
-	if (nbThread < nbSlow)
+	if (nbThread > 0 && nbThread < nbSlow)
 	{
 		cout << "the number of threads must be greater or equal to the number of slow threads" << endl;
 		return -1;
@@ -164,3 +217,29 @@ void parsePlaces(const string& str, int * tab)
 	if (str.compare(0, str1.size(),str1) == 0)
 	{;}
 }
+
+
+int getCpuPerNode()
+{
+	unsigned depth, nbcpu, nbnode;
+	hwloc_topology_t topo;
+
+	depth = hwloc_topology_init(&topo);
+	hwloc_topology_load(topo);
+
+	nbnode = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_NODE);
+	nbcpu = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_PU);
+
+	printf("nbnode : %d, nbcpu : %d\n",nbnode,nbcpu);
+	if (nbnode <= 0 && nbcpu > 0)
+		//no numa node found
+		return nbcpu;
+	else if (nbcpu > 0)
+		return nbcpu / nbnode;
+	else
+	{
+		printf("failed to get topo\n");
+		return -1;
+	}
+}
+

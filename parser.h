@@ -2,13 +2,17 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#include <hwloc.h>
 
 using namespace std;
 
 #ifndef THR_PARAM
 #define THR_PARAM
 	
-#define NCORES_PER_NODE 4
+#define NCORES_PER_NODE 8
+int getCpuPerNode();
+
+
 // implementation in parser.cpp
 class ThrParam
 {
@@ -16,6 +20,9 @@ class ThrParam
 
 	//every fields
 	
+	
+	// number of CPU per NUMA node
+	int nbPUNode;
 	//total number of threads
 	int nbThread; 
 	// number of slow threads
@@ -33,6 +40,9 @@ class ThrParam
 	ThrParam(int nbThread, int nbSlow, bool close);
 	//destructor
 	~ThrParam();
+
+	//print every info about parameters
+	void info();
 };
 
 #endif // THR_PARAM

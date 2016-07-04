@@ -55,6 +55,8 @@ int main(int argc, char ** argv)
 		cout << "param not allocated !!" << endl;
 		exit(EXIT_FAILURE);
 	}
+
+	param->info();
 	
 
 

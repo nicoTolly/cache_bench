@@ -8,7 +8,7 @@ else
 	EXEC= load
 endif
 SRC= load-test.cpp parser.cpp utils.cpp
-LDFLAGS= -lpthread -lrt
+LDFLAGS= -lpthread -lrt -lhwloc
 
 PROJECT_ROOT_DIR= $(shell pwd)
 
