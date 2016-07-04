@@ -1,0 +1,118 @@
+load-test.cpp:176:4: warning: missing terminating " character
+    "
+    ^
+load-test.cpp:176:4: error: missing terminating " character
+load-test.cpp:204:4: warning: missing terminating " character
+    "
+    ^
+load-test.cpp:204:4: error: missing terminating " character
+load-test.cpp: In function ‘void load_asm(double*, int, int)’:
+load-test.cpp:177:4: error: expected string-literal before ‘movq’
+    movq %0, %%esi;
+    ^
+load-test.cpp:178:4: error: ‘movq’ was not declared in this scope
+    movq %1, %%ebx;
+    ^
+load-test.cpp:178:13: error: expected primary-expression before ‘%’ token
+    movq %1, %%ebx;
+             ^
+load-test.cpp:178:14: error: expected primary-expression before ‘%’ token
+    movq %1, %%ebx;
+              ^
+load-test.cpp:178:15: error: ‘ebx’ was not declared in this scope
+    movq %1, %%ebx;
+               ^
+load-test.cpp:179:13: error: expected primary-expression before ‘%’ token
+    movq %2, %%edx;
+             ^
+load-test.cpp:179:14: error: expected primary-expression before ‘%’ token
+    movq %2, %%edx;
+              ^
+load-test.cpp:179:15: error: ‘edx’ was not declared in this scope
+    movq %2, %%edx;
+               ^
+load-test.cpp:181:4: error: ‘mov’ was not declared in this scope
+    mov $0, %%ecx;
+    ^
+load-test.cpp:182:4: error: ‘compq’ was not declared in this scope
+    compq %%edx, %%ecx;
+    ^
+load-test.cpp:182:11: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+           ^
+load-test.cpp:182:17: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+                 ^
+load-test.cpp:182:18: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+                  ^
+load-test.cpp:182:19: error: ‘ecx’ was not declared in this scope
+    compq %%edx, %%ecx;
+                   ^
+load-test.cpp:183:4: error: ‘jge’ was not declared in this scope
+    jge 4f;
+    ^
+load-test.cpp:186:4: error: expected primary-expression before ‘:’ token
+    :1;
+    ^
+load-test.cpp:187:8: error: expected ‘;’ before ‘$0’
+    mov $0, %%ecx;
+        ^
+load-test.cpp:188:11: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+           ^
+load-test.cpp:188:17: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+                 ^
+load-test.cpp:188:18: error: expected primary-expression before ‘%’ token
+    compq %%edx, %%ecx;
+                  ^
+load-test.cpp:189:8: error: expected ‘;’ before numeric constant
+    jge 3f;
+        ^
+load-test.cpp:191:4: error: expected primary-expression before ‘:’ token
+    :2;
+    ^
+load-test.cpp:192:4: error: ‘addq’ was not declared in this scope
+    addq $1, %%eax;
+    ^
+load-test.cpp:193:11: error: expected primary-expression before ‘%’ token
+    compq %%ebx, %%eax;
+           ^
+load-test.cpp:193:17: error: expected primary-expression before ‘%’ token
+    compq %%ebx, %%eax;
+                 ^
+load-test.cpp:193:18: error: expected primary-expression before ‘%’ token
+    compq %%ebx, %%eax;
+                  ^
+load-test.cpp:193:19: error: ‘eax’ was not declared in this scope
+    compq %%ebx, %%eax;
+                   ^
+load-test.cpp:194:4: error: ‘jl’ was not declared in this scope
+    jl 1b;
+    ^
+load-test.cpp:197:4: error: expected primary-expression before ‘:’ token
+    :3;
+    ^
+load-test.cpp:199:9: error: expected ‘;’ before ‘$1’
+    addq $1, %%ecx;
+         ^
+load-test.cpp:200:11: error: expected primary-expression before ‘%’ token
+    compq %%ecx, %%edx;
+           ^
+load-test.cpp:200:17: error: expected primary-expression before ‘%’ token
+    compq %%ecx, %%edx;
+                 ^
+load-test.cpp:200:18: error: expected primary-expression before ‘%’ token
+    compq %%ecx, %%edx;
+                  ^
+load-test.cpp:201:7: error: expected ‘;’ before numeric constant
+    jl 1b;
+       ^
+load-test.cpp:203:4: error: expected primary-expression before ‘:’ token
+    :4;
+    ^
+load-test.cpp:205:2: error: expected primary-expression before ‘:’ token
+  : 
+  ^
+make: *** [load-test.o] Error 1
