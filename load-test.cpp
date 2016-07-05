@@ -7,7 +7,6 @@
 #include "utils.h"
 
 
-#define N (1<<20)
 #define K (1<<4)
 void * handler(void * arg);
 void * handler_slw(void * arg);
@@ -82,7 +81,7 @@ int main(int argc, char ** argv)
 
 
 	//initializing tab containing data to be loaded
-	tab = new double[param->nbThread * N + 8];
+	tab = new double[param->nbThread * param->size + 8];
 	if(tab == NULL)
 	{
 		cout << "could not allocate tab" << endl;
@@ -94,15 +93,15 @@ int main(int argc, char ** argv)
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
 #pragma omp for
-	for (long i = 0; i < param->nbThread * N; i++)
+	for (long i = 0; i < param->nbThread * param->size; i++)
 	{
 		tab[i]= 3.4;
 	}
 
 
 	printf(HLINE);
-	unsigned int bytes= param->nbThread * N * sizeof(double);
-	printf("N = %d, %d threads will be called, loading %d%c bytes of data %d times\n", N, param->nbThread, siz(bytes), units(bytes), K);
+	unsigned int bytes= param->nbThread * param->size * sizeof(double);
+	printf("N = %d, %d threads will be called, loading %d%c bytes of data %d times\n", param->size, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
 
@@ -119,18 +118,18 @@ int main(int argc, char ** argv)
 	int i;
 	for(i = 1; i < nbFst; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * N ;
+		hargs[i].t = tab + (intptr_t) i * param->size ;
 		hargs[i].bar = &bar; 
-		hargs[i].size = N; 
+		hargs[i].size = param->size; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 	}
 
 	for(; i < param->nbThread; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * N ;
+		hargs[i].t = tab + (intptr_t) i * param->size ;
 		hargs[i].bar = &bar; 
-		hargs[i].size = N; 
+		hargs[i].size = param->size; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 	}
@@ -183,7 +182,7 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].size = N; 
+	hargs[0].size = param->size; 
 	hargs[0].niter = K; 
 	if(param->nbThread == param->nbSlow)
 		handler_slw((void *)&hargs[0]);

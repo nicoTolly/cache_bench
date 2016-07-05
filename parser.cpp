@@ -2,8 +2,15 @@
 
 using namespace std;
 
+class myexception: public exception
+{
+  virtual const char* what() const throw()
+  {
+    return "The number of threads must be greater or equal to the number of slow threads";
+  }
+} myex;
 
-ThrParam::ThrParam():nbSlow(0),close(true), slwThrList(NULL)
+ThrParam::ThrParam():siz(NDEFAULT), nbSlow(0),close(true)
 {
 	int res;
 
@@ -15,7 +22,7 @@ ThrParam::ThrParam():nbSlow(0),close(true), slwThrList(NULL)
 	this->init();
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw):nbSlow(nbSlw),close(true)
+ThrParam::ThrParam(int nbT, int nbSlw):siz(NDEFAULT), nbSlow(nbSlw),close(true)
 {
 	int res;
 
@@ -34,7 +41,22 @@ ThrParam::ThrParam(int nbT, int nbSlw):nbSlow(nbSlw),close(true)
 
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
+ThrParam::ThrParam(int nbT, int nbSlw, bool close):siz(NDEFAULT), nbSlow(nbSlw), close(close)
+{
+	int res;
+
+	if((res = getCpuPerNode()) < 0)
+		nbPUNode = NCORES_PER_NODE;
+	else
+		nbPUNode = res;
+	if (nbT == -1)
+		nbThread = nbPUNode;
+	else
+		nbThread = nbT;
+	this->init();
+}
+
+ThrParam::ThrParam(int nbT, int nbSlw, bool close, int siz):siz(siz), nbSlow(nbSlw), close(close)
 {
 	int res;
 
@@ -51,13 +73,25 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
 
 void ThrParam::init()
 {
-	if (nbSlow == nbThread)
+	if(nbSlow > nbThread)
+	{
+		throw myex;
+	}
+	else if (nbSlow == nbThread)
 	{
 		this->fstThrList = NULL;
 		this->slwThrList = new int[nbSlow];
 		for(int i = 0; i < nbThread; i++)
 			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
 			this->slwThrList[i] = i % nbPUNode;
+	}
+	else if (nbSlow == 0)
+	{
+		this->slwThrList = NULL;
+		this->fstThrList = new int[nbThread];
+		for(int i = 0; i < nbThread; i++)
+			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
+			this->fstThrList[i] = i % nbPUNode;
 	}
 	else if(close)
 		//case we want to place every
@@ -98,6 +132,7 @@ void ThrParam::info()
 {
 		int nbFst = nbThread - nbSlow;
 		cout << nbThread << " threads to be launched" << endl;
+		cout << siz << " double per thread" << endl;
 		if (nbFst > 0)
 		{
 			printf("Lauching %d fast threads\n", nbFst);
@@ -133,6 +168,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 	bool close=true;
 	int * fstThr;
 	int * slwThr;
+	int siz = NDEFAULT;
 
 
 
@@ -145,6 +181,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 	const string str1 = "-n=";
 	const string str2 = "-slow=";
 	const string str3 = "-places=";
+	const string str4 = "-size=";
 	const string cstr= "close"; 
 	const string sstr= "spread"; 
 	for (int i = 0; i < argc - 1; i++)
@@ -172,18 +209,28 @@ int parseArg(int argc, char * args[], ThrParam **param)
 				return -1;
 			}
 		}
+		else if (arr[i].compare(0, str4.size(), str4) == 0)
+		{
+			string nbstr= arr[i].substr(str2.size(), string::npos);
+			int a= stoi(nbstr, NULL);
+			siz = 1 << a;
+		}
 		else
 			return -1;
 
 	}
 
-	if (nbThread > 0 && nbThread < nbSlow)
-	{
-		cout << "the number of threads must be greater or equal to the number of slow threads" << endl;
-		return -1;
-	}
 
-	*param = new ThrParam(nbThread, nbSlow, close);
+	try
+	{
+		*param = new ThrParam(nbThread, nbSlow, close, siz);
+	}
+	// case nbThread > nbSlow
+	catch (exception& e)
+	{
+		cout << e.what() << endl;
+		exit(EXIT_FAILURE);
+	}
 	if (*param == NULL)
 		cout << "param not allocated in parse" << endl;
 
