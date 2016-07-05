@@ -248,21 +248,21 @@ void parsePlaces(const string& str, int * tab)
 
 int getCpuPerNode()
 {
-	unsigned depth, nbcpu, nbnode;
+	unsigned depth, nbcpu, nbsock;
 	hwloc_topology_t topo;
 
 	depth = hwloc_topology_init(&topo);
 	hwloc_topology_load(topo);
 
-	nbnode = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_NODE);
+	nbsock = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_SOCKET);
 	nbcpu = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_PU);
 
-	printf("nbnode : %d, nbcpu : %d\n",nbnode,nbcpu);
-	if (nbnode <= 0 && nbcpu > 0)
+	printf("nbsock : %d, nbcpu : %d\n",nbsock,nbcpu);
+	if (nbsock <= 0 && nbcpu > 0)
 		//no numa node found
 		return nbcpu;
 	else if (nbcpu > 0)
-		return nbcpu / nbnode;
+		return nbcpu / nbsock;
 	else
 	{
 		printf("failed to get topo\n");

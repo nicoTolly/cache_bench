@@ -81,7 +81,7 @@ int main(int argc, char ** argv)
 
 
 	//initializing tab containing data to be loaded
-	tab = new double[param->nbThread * param->size + 8];
+	tab = new double[param->nbThread * param->siz + 8];
 	if(tab == NULL)
 	{
 		cout << "could not allocate tab" << endl;
@@ -93,15 +93,15 @@ int main(int argc, char ** argv)
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
 #pragma omp for
-	for (long i = 0; i < param->nbThread * param->size; i++)
+	for (long i = 0; i < param->nbThread * param->siz; i++)
 	{
 		tab[i]= 3.4;
 	}
 
 
 	printf(HLINE);
-	unsigned int bytes= param->nbThread * param->size * sizeof(double);
-	printf("N = %d, %d threads will be called, loading %d%c bytes of data %d times\n", param->size, param->nbThread, siz(bytes), units(bytes), K);
+	unsigned int bytes= param->nbThread * param->siz * sizeof(double);
+	printf("N = %d, %d threads will be called, loading %d%c bytes of data %d times\n", param->siz, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
 
@@ -118,18 +118,18 @@ int main(int argc, char ** argv)
 	int i;
 	for(i = 1; i < nbFst; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * param->size ;
+		hargs[i].t = tab + (intptr_t) i * param->siz ;
 		hargs[i].bar = &bar; 
-		hargs[i].size = param->size; 
+		hargs[i].size = param->siz; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 	}
 
 	for(; i < param->nbThread; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * param->size ;
+		hargs[i].t = tab + (intptr_t) i * param->siz ;
 		hargs[i].bar = &bar; 
-		hargs[i].size = param->size; 
+		hargs[i].size = param->siz; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 	}
@@ -182,7 +182,7 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].size = param->size; 
+	hargs[0].size = param->siz; 
 	hargs[0].niter = K; 
 	if(param->nbThread == param->nbSlow)
 		handler_slw((void *)&hargs[0]);
