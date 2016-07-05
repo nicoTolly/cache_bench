@@ -12,9 +12,7 @@ ThrParam::ThrParam():nbSlow(0),close(true), slwThrList(NULL)
 	else
 		nbPUNode = res;
 	nbThread = nbPUNode;
-	this->fstThrList = new int[NCORES_PER_NODE] ;
-	for(int i = 0; i < nbPUNode; i++)
-		this->fstThrList[i] = i;
+	this->init();
 }
 
 ThrParam::ThrParam(int nbT, int nbSlw):nbSlow(nbSlw),close(true)
@@ -32,31 +30,7 @@ ThrParam::ThrParam(int nbT, int nbSlw):nbSlow(nbSlw),close(true)
 		nbThread = nbPUNode;
 	else
 		nbThread = nbT;
-	if (nbSlw == nbT)
-	{
-		this->fstThrList = NULL;
-		this->slwThrList = new int[nbSlw];
-		for(int i = 0; i < nbThread; i++)
-			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
-			this->slwThrList[i] = i % nbPUNode;
-	}
-	else
-	{
-		int nbFst = nbThread - nbSlow;
-		this->fstThrList = new int[nbFst];
-		this->slwThrList = new int[nbSlw];
-		int i=0, j=0;
-		for(; i < nbFst; i++)
-		{
-			this->fstThrList[i]= i % nbPUNode;
-		}
-		for(; j < nbSlw; i++, j++)
-		{
-			printf("slow thread %d placed on cpu %d\n", j, i % nbPUNode);
-			this->slwThrList[j]= i % nbPUNode;
-		}
-
-	}
+	this->init();
 
 }
 
@@ -72,10 +46,15 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
 		nbThread = nbPUNode;
 	else
 		nbThread = nbT;
-	if (nbSlw == nbThread)
+	this->init();
+}
+
+void ThrParam::init()
+{
+	if (nbSlow == nbThread)
 	{
 		this->fstThrList = NULL;
-		this->slwThrList = new int[nbSlw];
+		this->slwThrList = new int[nbSlow];
 		for(int i = 0; i < nbThread; i++)
 			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
 			this->slwThrList[i] = i % nbPUNode;
@@ -86,13 +65,13 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
 	{
 		int nbFst = nbThread - nbSlow;
 		this->fstThrList = new int[nbFst];
-		this->slwThrList = new int[nbSlw];
+		this->slwThrList = new int[nbSlow];
 		int i=0, j=0;
 		for(; i < nbFst; i++)
 		{
 			this->fstThrList[i]= i % nbPUNode;
 		}
-		for(; j < nbSlw; i++, j++)
+		for(; j < nbSlow; i++, j++)
 		{
 			this->slwThrList[j]=  i % nbPUNode;
 		}
@@ -101,18 +80,19 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):nbSlow(nbSlw), close(close)
 	{
 		int nbFst = nbThread - nbSlow;
 		this->fstThrList = new int[nbFst];
-		this->slwThrList = new int[nbSlw];
+		this->slwThrList = new int[nbSlow];
 		int i=0, j=0;
 		for(; i < nbFst; i++)
 		{
 			this->fstThrList[i]= i % nbPUNode;
 		}
-		for(; j < nbSlw; j++)
+		for(; j < nbSlow; j++)
 		{
 			this->slwThrList[j]= nbPUNode + j % nbPUNode;
 		}
 	}
 }
+
 
 void ThrParam::info()
 {

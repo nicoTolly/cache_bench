@@ -99,3 +99,40 @@ double mysecond()
  
         return ( (double) ti.tv_sec + (double) ti.tv_nsec * 1.e-9 );
 }
+
+char units_d(double f)
+{ 
+	long n = (long) f;
+	long frac;
+	frac = n/1024;
+	if (frac == 0) return(' ');
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return('K');
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return('M');
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return('G');
+	printf("Error: n is too large!\n");
+}
+
+
+double siz_d( double f)
+{ 
+	long n = (long) f;
+	long frac;
+	frac = n/1024;
+	if (frac == 0) return f;
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return f/1024;
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return f/(1024 * 1024);
+	n = n/1024;
+	frac = n/1024;
+	if (frac == 0) return f/(1024 * 1024 * 1024);
+	printf("Error: n is too large!\n");
+}

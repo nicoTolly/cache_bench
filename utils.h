@@ -19,6 +19,8 @@
 
 char units(unsigned int n);
 int siz(unsigned int n);
+char units_d(double f);
+double siz_d(double n);
 inline unsigned long get_cycles();
 int checktick();
 double mysecond();

@@ -21,6 +21,8 @@ class ThrParam
 	//every fields
 	
 	
+	//standard size of array
+	long size;
 	// number of CPU per NUMA node
 	int nbPUNode;
 	//total number of threads
@@ -43,6 +45,10 @@ class ThrParam
 
 	//print every info about parameters
 	void info();
+
+	private:
+
+	void init();
 };
 
 #endif // THR_PARAM

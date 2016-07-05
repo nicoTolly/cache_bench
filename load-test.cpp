@@ -20,10 +20,14 @@ __m256d trash;
 ThrParam *param;
 
 
+//arguments passed
+//to thread handler
 typedef struct 
 {
 	double *t;
 	pthread_barrier_t * bar;
+	long size;
+	long niter;
 } args_t;
 
 
@@ -117,6 +121,8 @@ int main(int argc, char ** argv)
 	{
 		hargs[i].t = tab + (intptr_t) i * N ;
 		hargs[i].bar = &bar; 
+		hargs[i].size = N; 
+		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 	}
 
@@ -124,6 +130,8 @@ int main(int argc, char ** argv)
 	{
 		hargs[i].t = tab + (intptr_t) i * N ;
 		hargs[i].bar = &bar; 
+		hargs[i].size = N; 
+		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 	}
 
@@ -175,6 +183,8 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
+	hargs[0].size = N; 
+	hargs[0].niter = K; 
 	if(param->nbThread == param->nbSlow)
 		handler_slw((void *)&hargs[0]);
 	else
@@ -203,11 +213,15 @@ void * handler(void * arg)
 {
 	args_t * args = (args_t *) arg;
 	pthread_barrier_wait(args->bar);
+
+
+	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 	time = mysecond();
-	load_asm(args->t, N, K);
+	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
-	printf("Fast thread has taken %11.8f to execute\n", time);
+	printf("Fast thread has taken %11.8f to execute\n \
+Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }
@@ -216,11 +230,15 @@ void * handler_slw(void * arg)
 {
 	args_t * args = (args_t *) arg;
 	pthread_barrier_wait(args->bar);
+
+
+	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 	time = mysecond();
-	load_asm_slw(args->t, N, K);
+	load_asm_slw(args->t, args->size, args->niter);
 	time = mysecond() - time;
-	printf("Slow thread has taken %11.8f to execute\n", time);
+	printf("Slow thread has taken %11.8f to execute\n \
+Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
 	return NULL;
 }
 
@@ -363,6 +381,63 @@ void load_asm_slw(double const * t, intptr_t n, intptr_t k)
 			"1:;"
 			//vload from memory
 			"vmovapd (%2, %%rax, 8), %%ymm1;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
+			"nop;"
 			"nop;"
 			"nop;"
 			"nop;"
