@@ -9,3 +9,6 @@ load
 load.db
 
 .depend
+
+
+*.swp
