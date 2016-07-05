@@ -15,7 +15,7 @@ ThrParam::ThrParam():siz(NDEFAULT), nbSlow(0),close(true)
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_NODE;
+		nbPUNode = NCORES_PER_SOCK;
 	else
 		nbPUNode = res;
 	nbThread = nbPUNode;
@@ -27,7 +27,7 @@ ThrParam::ThrParam(int nbT, int nbSlw):siz(NDEFAULT), nbSlow(nbSlw),close(true)
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_NODE;
+		nbPUNode = NCORES_PER_SOCK;
 	else
 		nbPUNode = res;
 
@@ -46,7 +46,7 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):siz(NDEFAULT), nbSlow(nbSlw),
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_NODE;
+		nbPUNode = NCORES_PER_SOCK;
 	else
 		nbPUNode = res;
 	if (nbT == -1)
@@ -61,7 +61,7 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close, int siz):siz(siz), nbSlow(nbS
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_NODE;
+		nbPUNode = NCORES_PER_SOCK;
 	else
 		nbPUNode = res;
 	if (nbT == -1)
@@ -82,7 +82,7 @@ void ThrParam::init()
 		this->fstThrList = NULL;
 		this->slwThrList = new int[nbSlow];
 		for(int i = 0; i < nbThread; i++)
-			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
+			// take modulo NCORES_PER_SOCK cause we have NCORES_PER_SOCK cores
 			this->slwThrList[i] = i % nbPUNode;
 	}
 	else if (nbSlow == 0)
@@ -90,7 +90,7 @@ void ThrParam::init()
 		this->slwThrList = NULL;
 		this->fstThrList = new int[nbThread];
 		for(int i = 0; i < nbThread; i++)
-			// take modulo NCORES_PER_NODE cause we have NCORES_PER_NODE cores
+			// take modulo NCORES_PER_SOCK cause we have NCORES_PER_SOCK cores
 			this->fstThrList[i] = i % nbPUNode;
 	}
 	else if(close)
@@ -248,6 +248,7 @@ void parsePlaces(const string& str, int * tab)
 
 int getCpuPerNode()
 {
+#ifdef HWLOC
 	unsigned depth, nbcpu, nbsock;
 	hwloc_topology_t topo;
 
@@ -268,5 +269,9 @@ int getCpuPerNode()
 		printf("failed to get topo\n");
 		return -1;
 	}
+#else
+	printf("HWLOC not defined \n");
+	return -1;
+#endif
 }
 

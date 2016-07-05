@@ -7,13 +7,15 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#ifdef HWLOC
 #include <hwloc.h>
+#endif // HWLOC
 
 using namespace std;
 
 	
 #define NDEFAULT (1 << 20)
-#define NCORES_PER_NODE 8
+#define NCORES_PER_SOCK 4
 int getCpuPerNode();
 
 

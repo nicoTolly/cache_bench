@@ -1,5 +1,7 @@
 CC=g++
 DEBUG=
+HWLOC=
+
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx -O3
 	EXEC= load.db
@@ -7,8 +9,18 @@ else
 	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -mavx -O3
 	EXEC= load
 endif
+
+
+
+
 SRC= load-test.cpp parser.cpp utils.cpp
-LDFLAGS= -lpthread -lrt -lhwloc
+LDFLAGS= -lpthread -lrt 
+
+ifeq ($(HWLOC), yes)
+	CXXFLAGS+= "-DHWLOC"
+	LDFLAGS+= "-lhwloc"
+endif
+
 
 PROJECT_ROOT_DIR= $(shell pwd)
 
