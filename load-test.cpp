@@ -7,7 +7,7 @@
 #include "utils.h"
 
 
-#define K (1<<4)
+#define K (1<<8)
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
@@ -224,11 +224,14 @@ int main(int argc, char ** argv)
 void * handler(void * arg)
 {
 	args_t * args = (args_t *) arg;
+	double ld = sizeof(double) * args->size * args->niter;
+	double time;
+
+
+	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
 
 
-	double ld = sizeof(double) * args->size * args->niter;
-	double time;
 	time = mysecond();
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
@@ -241,11 +244,14 @@ Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
 void * handler_slw(void * arg)
 {
 	args_t * args = (args_t *) arg;
+	double ld = sizeof(double) * args->size * args->niter;
+	double time;
+
+
+	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
 
 
-	double ld = sizeof(double) * args->size * args->niter;
-	double time;
 	time = mysecond();
 	load_asm_slw(args->t, args->size, args->niter);
 	time = mysecond() - time;
