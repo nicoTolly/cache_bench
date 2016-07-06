@@ -10,24 +10,24 @@ class myexception: public exception
   }
 } myex;
 
-ThrParam::ThrParam():siz(NDEFAULT), nbSlow(0),close(true)
+ThrParam::ThrParam():fsiz(NDEFAULT), ssiz(NDEFAULT),nbSlow(0),close(true)
 {
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_SOCK;
+		nbPUNode = NCPU_PER_SOCK;
 	else
 		nbPUNode = res;
 	nbThread = nbPUNode;
 	this->init();
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw):siz(NDEFAULT), nbSlow(nbSlw),close(true)
+ThrParam::ThrParam(int nbT, int nbSlw):fsiz(NDEFAULT),ssiz(NDEFAULT), nbSlow(nbSlw),close(true)
 {
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_SOCK;
+		nbPUNode = NCPU_PER_SOCK;
 	else
 		nbPUNode = res;
 
@@ -41,12 +41,12 @@ ThrParam::ThrParam(int nbT, int nbSlw):siz(NDEFAULT), nbSlow(nbSlw),close(true)
 
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw, bool close):siz(NDEFAULT), nbSlow(nbSlw), close(close)
+ThrParam::ThrParam(int nbT, int nbSlw, bool close):fsiz(NDEFAULT),ssiz(NDEFAULT), nbSlow(nbSlw), close(close)
 {
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_SOCK;
+		nbPUNode = NCPU_PER_SOCK;
 	else
 		nbPUNode = res;
 	if (nbT == -1)
@@ -56,18 +56,37 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close):siz(NDEFAULT), nbSlow(nbSlw),
 	this->init();
 }
 
-ThrParam::ThrParam(int nbT, int nbSlw, bool close, int siz):siz(siz), nbSlow(nbSlw), close(close)
+ThrParam::ThrParam(int nbT, int nbSlw, bool close, int siz):fsiz(siz), ssiz(siz), nbSlow(nbSlw), close(close)
 {
 	int res;
 
 	if((res = getCpuPerNode()) < 0)
-		nbPUNode = NCORES_PER_SOCK;
+		nbPUNode = NCPU_PER_SOCK;
 	else
 		nbPUNode = res;
 	if (nbT == -1)
 		nbThread = nbPUNode;
 	else
 		nbThread = nbT;
+	this->init();
+}
+
+ThrParam::ThrParam(int nbT, int nbSlw, bool close, int fsiz, float ratio):fsiz(fsiz), nbSlow(nbSlw), close(close)
+{
+	int res;
+
+	if((res = getCpuPerNode()) < 0)
+		nbPUNode = NCPU_PER_SOCK;
+	else
+		nbPUNode = res;
+	if (nbT == -1)
+		nbThread = nbPUNode;
+	else
+		nbThread = nbT;
+	// compute slow threads array size
+	// from fast thread array size
+	// must guarantee alignment on 32 bytes
+	ssiz =(int) (ratio * fsiz) & ~0x3;	
 	this->init();
 }
 
@@ -82,7 +101,7 @@ void ThrParam::init()
 		this->fstThrList = NULL;
 		this->slwThrList = new int[nbSlow];
 		for(int i = 0; i < nbThread; i++)
-			// take modulo NCORES_PER_SOCK cause we have NCORES_PER_SOCK cores
+			// take modulo NCPU_PER_SOCK cause we have NCPU_PER_SOCK cores
 			this->slwThrList[i] = i % nbPUNode;
 	}
 	else if (nbSlow == 0)
@@ -90,7 +109,7 @@ void ThrParam::init()
 		this->slwThrList = NULL;
 		this->fstThrList = new int[nbThread];
 		for(int i = 0; i < nbThread; i++)
-			// take modulo NCORES_PER_SOCK cause we have NCORES_PER_SOCK cores
+			// take modulo NCPU_PER_SOCK cause we have NCPU_PER_SOCK cores
 			this->fstThrList[i] = i % nbPUNode;
 	}
 	else if(close)
@@ -125,6 +144,7 @@ void ThrParam::init()
 			this->slwThrList[j]= nbPUNode + j % nbPUNode;
 		}
 	}
+	this->globsiz = this->ssiz + this->fsiz;
 }
 
 
@@ -132,7 +152,8 @@ void ThrParam::info()
 {
 		int nbFst = nbThread - nbSlow;
 		cout << nbThread << " threads to be launched" << endl;
-		cout << siz << " double per thread" << endl;
+		cout << fsiz << " double per fast thread" << endl;
+		cout << ssiz << " double per slow thread" << endl;
 		if (nbFst > 0)
 		{
 			printf("Lauching %d fast threads\n", nbFst);
@@ -166,9 +187,8 @@ int parseArg(int argc, char * args[], ThrParam **param)
 {
 	int nbThread=-1, nbSlow=0;
 	bool close=true;
-	int * fstThr;
-	int * slwThr;
 	int siz = NDEFAULT;
+	float ratio = 1;
 
 
 
@@ -182,6 +202,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 	const string str2 = "-slow=";
 	const string str3 = "-places=";
 	const string str4 = "-size=";
+	const string str5 = "-ratio=";
 	const string cstr= "close"; 
 	const string sstr= "spread"; 
 	for (int i = 0; i < argc - 1; i++)
@@ -211,9 +232,14 @@ int parseArg(int argc, char * args[], ThrParam **param)
 		}
 		else if (arr[i].compare(0, str4.size(), str4) == 0)
 		{
-			string nbstr= arr[i].substr(str2.size(), string::npos);
+			string nbstr= arr[i].substr(str4.size(), string::npos);
 			int a= stoi(nbstr, NULL);
 			siz = 1 << a;
+		}
+		else if (arr[i].compare(0, str5.size(), str5) == 0)
+		{
+			string nbstr= arr[i].substr(str5.size(), string::npos);
+			 ratio= stof(nbstr, NULL);
 		}
 		else
 			return -1;
@@ -223,7 +249,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 
 	try
 	{
-		*param = new ThrParam(nbThread, nbSlow, close, siz);
+		*param = new ThrParam(nbThread, nbSlow, close, siz, ratio);
 	}
 	// case nbThread > nbSlow
 	catch (exception& e)

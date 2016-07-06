@@ -1,6 +1,6 @@
 CC=g++
 DEBUG=
-HWLOC=
+HWLOC=yes
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx -O3
@@ -56,7 +56,8 @@ depend:.depend
 
 .depend: $(SRC)
 	rm -f ./.depend
-	$(CC) $(CXXFLAGS) -MM $^ -MF ./.depend
+	$(CC) $(CXXFLAGS) -MM $^ | sed -e "s:\(.*\.o\):$(PROJECT_ROOT_DIR)/release_obj/\1:g" >> ./.depend
+	$(CC) $(CXXFLAGS) -MM $^ | sed -e "s:\(.*\.o\):$(PROJECT_ROOT_DIR)/debug_obj/\1:g" >> ./.depend
 
 
 include .depend

@@ -2,7 +2,6 @@
 #ifndef _PARS_
 #define _PARS_
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -12,10 +11,11 @@
 #endif // HWLOC
 
 using namespace std;
-
 	
+
+
 #define NDEFAULT (1 << 20)
-#define NCORES_PER_SOCK 4
+#define NCPU_PER_SOCK 4
 int getCpuPerNode();
 
 
@@ -27,8 +27,11 @@ class ThrParam
 	//every fields
 	
 	
+	long globsiz;
 	//standard size of array
-	long siz;
+	long fsiz;
+	//standard size of array
+	long ssiz;
 	// number of CPU per NUMA node
 	int nbPUNode;
 	//total number of threads
@@ -47,6 +50,7 @@ class ThrParam
 	ThrParam(int nbThread, int nbSlow);
 	ThrParam(int nbThread, int nbSlow, bool close);
 	ThrParam(int nbThread, int nbSlow, bool close, int siz);
+	ThrParam(int nbThread, int nbSlow, bool close, int siz, float ratio);
 	//destructor
 	~ThrParam();
 

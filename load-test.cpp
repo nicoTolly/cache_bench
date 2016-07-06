@@ -50,7 +50,7 @@ int main(int argc, char ** argv)
 	int ret = parseArg(argc, argv,  &param);
 	if (ret < 0)
 	{
-		printf("usage : ./load -n=<threads number> -slow=<number of slow threads> -places=<core places| close | spread>\n");
+		printf("usage : ./load -n=<threads number> -slow=<number of slow threads> -size=<power of two> -places=<core places| close | spread>\n");
 		exit(EXIT_FAILURE);
 	}
 	if (param == NULL)
@@ -80,8 +80,9 @@ int main(int argc, char ** argv)
 	
 
 
+	int nbFst = param->nbThread - param->nbSlow;
 	//initializing tab containing data to be loaded
-	tab = new double[param->nbThread * param->siz + 8];
+	tab = new double[nbFst * param->fsiz + param->nbSlow * param->ssiz + 8];
 	if(tab == NULL)
 	{
 		cout << "could not allocate tab" << endl;
@@ -93,15 +94,15 @@ int main(int argc, char ** argv)
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
 #pragma omp for
-	for (long i = 0; i < param->nbThread * param->siz; i++)
+	for (long i = 0; i <  param->globsiz; i++)
 	{
 		tab[i]= 3.4;
 	}
 
 
 	printf(HLINE);
-	unsigned int bytes= param->nbThread * param->siz * sizeof(double);
-	printf("N = %d, %d threads will be called, loading %d%c bytes of data %d times\n", param->siz, param->nbThread, siz(bytes), units(bytes), K);
+	unsigned int bytes= param->nbThread * param->globsiz * sizeof(double);
+	printf("N = %d, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
 
@@ -113,25 +114,32 @@ int main(int argc, char ** argv)
 	pthread_barrier_init(&bar, NULL, param->nbThread);
 	args_t hargs[param->nbThread];
 
-	int nbFst = param->nbThread - param->nbSlow;
 
 	int i;
+	intptr_t offset = 0;
+	if (param->nbSlow == param->nbThread)
+		offset += param->ssiz;
+	else
+		offset += param->fsiz;
+		
 	for(i = 1; i < nbFst; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * param->siz ;
+		hargs[i].t = tab + offset;
 		hargs[i].bar = &bar; 
-		hargs[i].size = param->siz; 
+		hargs[i].size = param->fsiz; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
+		offset +=  param->fsiz;
 	}
 
 	for(; i < param->nbThread; i++)
 	{
-		hargs[i].t = tab + (intptr_t) i * param->siz ;
+		hargs[i].t = tab + offset;
 		hargs[i].bar = &bar; 
-		hargs[i].size = param->siz; 
+		hargs[i].size = param->ssiz; 
 		hargs[i].niter = K; 
 		pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
+		offset +=  param->ssiz;
 	}
 
 	//Placing threads on appropriate cpu
@@ -182,12 +190,17 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].size = param->siz; 
 	hargs[0].niter = K; 
 	if(param->nbThread == param->nbSlow)
+	{
+		hargs[0].size = param->fsiz; 
 		handler_slw((void *)&hargs[0]);
+	}
 	else
+	{
+		hargs[0].size = param->ssiz; 
 		handler((void *)&hargs[0]);
+	}
 
 
 	for (int k = 0; k < param->nbThread; k++)
@@ -219,7 +232,7 @@ void * handler(void * arg)
 	time = mysecond();
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
-	printf("Fast thread has taken %11.8f to execute\n \
+	printf("Fast thread has taken %11.8f s to execute\n \
 Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
@@ -236,7 +249,7 @@ void * handler_slw(void * arg)
 	time = mysecond();
 	load_asm_slw(args->t, args->size, args->niter);
 	time = mysecond() - time;
-	printf("Slow thread has taken %11.8f to execute\n \
+	printf("Slow thread has taken %11.8f s to execute\n \
 Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
 	return NULL;
 }
