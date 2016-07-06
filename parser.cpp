@@ -144,7 +144,7 @@ void ThrParam::init()
 			this->slwThrList[j]= nbPUNode + j % nbPUNode;
 		}
 	}
-	this->globsiz = this->ssiz + this->fsiz;
+	this->globsiz = (nbThread - nbSlow) * this->ssiz + nbSlow * this->fsiz;
 }
 
 

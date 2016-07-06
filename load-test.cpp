@@ -101,7 +101,7 @@ int main(int argc, char ** argv)
 
 
 	printf(HLINE);
-	unsigned int bytes= param->nbThread * param->globsiz * sizeof(double);
+	unsigned int bytes= param->globsiz * sizeof(double);
 	printf("N = %d, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 

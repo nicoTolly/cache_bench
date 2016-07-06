@@ -3,7 +3,7 @@ DEBUG=
 HWLOC=yes
 
 ifeq ($(DEBUG),yes)
-	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx -O3
+	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx 
 	EXEC= load.db
 else
 	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -mavx -O3
