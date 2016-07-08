@@ -12,3 +12,6 @@ load.db
 
 
 *.swp
+
+
+omp_bench/bench_omp
