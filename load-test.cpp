@@ -193,12 +193,12 @@ int main(int argc, char ** argv)
 	hargs[0].niter = K; 
 	if(param->nbThread == param->nbSlow)
 	{
-		hargs[0].size = param->fsiz; 
+		hargs[0].size = param->ssiz; 
 		handler_slw((void *)&hargs[0]);
 	}
 	else
 	{
-		hargs[0].size = param->ssiz; 
+		hargs[0].size = param->fsiz; 
 		handler((void *)&hargs[0]);
 	}
 
