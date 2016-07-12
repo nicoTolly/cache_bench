@@ -144,7 +144,7 @@ void ThrParam::init()
 			this->slwThrList[j]= nbPUNode + j % nbPUNode;
 		}
 	}
-	this->globsiz = (nbThread - nbSlow) * this->ssiz + nbSlow * this->fsiz;
+	this->globsiz = (nbThread - nbSlow) * this->fsiz + nbSlow * this->ssiz;
 }
 
 
@@ -261,14 +261,6 @@ int parseArg(int argc, char * args[], ThrParam **param)
 		cout << "param not allocated in parse" << endl;
 
 	return 0;
-}
-
-void parsePlaces(const string& str, int * tab)
-{
-	const string str1= "close"; 
-	const string str2= "spread"; 
-	if (str.compare(0, str1.size(),str1) == 0)
-	{;}
 }
 
 

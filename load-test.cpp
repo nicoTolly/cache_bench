@@ -50,7 +50,7 @@ int main(int argc, char ** argv)
 	int ret = parseArg(argc, argv,  &param);
 	if (ret < 0)
 	{
-		printf("usage : ./load -n=<threads number> -slow=<number of slow threads> -size=<power of two> -places=<core places| close | spread>\n");
+		printf("usage : ./load -n=<threads number> -slow=<number of slow threads> -size=<power of two> -ratio=<ratio slow size / fast size> -places=<core places| close | spread>\n");
 		exit(EXIT_FAILURE);
 	}
 	if (param == NULL)
@@ -102,7 +102,7 @@ int main(int argc, char ** argv)
 
 	printf(HLINE);
 	unsigned int bytes= param->globsiz * sizeof(double);
-	printf("N = %d, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
 
@@ -253,7 +253,8 @@ void * handler_slw(void * arg)
 
 
 	time = mysecond();
-	load_asm_slw(args->t, args->size, args->niter);
+	//load_asm_slw(args->t, args->size, args->niter);
+	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	printf("Slow thread has taken %11.8f s to execute\n \
 Throughput :%f %cB/s \n", time, siz_d(ld / time), units_d(ld / time));
