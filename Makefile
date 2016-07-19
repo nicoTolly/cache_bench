@@ -1,6 +1,6 @@
 CC=g++
 DEBUG=
-HWLOC=
+HWLOC=yes
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx 
@@ -18,7 +18,7 @@ LDFLAGS= -lpthread -lrt
 
 ifeq ($(HWLOC), yes)
 	CXXFLAGS+= "-DHWLOC"
-	LDFLAGS+= "-lhwloc"
+	LDFLAGS+=-lhwloc
 endif
 
 
