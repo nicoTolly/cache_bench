@@ -264,6 +264,10 @@ int parseArg(int argc, char * args[], ThrParam **param)
 }
 
 
+// get number of cpu per socket
+// with hwloc function.
+// returns -1 if HWLOC is not defined
+// or if hwloc failed
 int getCpuPerNode()
 {
 #ifdef HWLOC
