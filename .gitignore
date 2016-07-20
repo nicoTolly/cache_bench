@@ -15,3 +15,11 @@ load.db
 
 
 omp_bench/bench_omp
+
+diff-threads/load
+diff-threads/load.db
+
+
+diff-threads/debug_obj/*
+diff-threads/release_obj/*
+diff-threads/bin/*

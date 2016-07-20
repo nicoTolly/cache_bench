@@ -53,6 +53,13 @@ for i in range(N):
         i -= 1
         break
 
+tab_str = ""
+
+for a in sorted_tab:
+    tab_str += str(a)
+    tab_str += " "
+
+print(tab_str)
 if(i == -1):
     print("Every thread is in full miss")
 else:
