@@ -18,7 +18,7 @@ LDFLAGS= -lpthread -lrt
 
 ifeq ($(HWLOC), yes)
 	CXXFLAGS+= "-DHWLOC"
-	LDFLAGS+= "-lhwloc"
+	LDFLAGS+=-lhwloc
 endif
 
 
