@@ -267,7 +267,7 @@ void * handler(void * arg)
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	printf("Fast thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput :%f %cB/s \n", args->size * sizeof(double), time, siz_d(ld / time), units_d(ld / time));
+Throughput : %f %cB/s \n", args->size * sizeof(double), time, siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }

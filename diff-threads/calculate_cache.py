@@ -61,10 +61,7 @@ for a in sorted_tab:
     tab_str += " "
 
 print(tab_str)
-if(i == -1):
-    print("Every thread is in full miss")
-else:
-    print("Last thread with full hits is number {0} ".format(i+1))
+print("{0} threads in full hits ".format(i+1))
 
 
 
