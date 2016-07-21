@@ -230,7 +230,7 @@ int main(int argc, char ** argv)
 	else
 	{
 		hargs[0].size = param->thrSizes[0];
-		handler_slw((void *)&hargs[0]);
+		handler((void *)&hargs[0]);
 	}
 
 

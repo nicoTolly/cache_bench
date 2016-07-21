@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import re
 
 
@@ -5,7 +6,7 @@ import re
 def get_cache():
     while(True):
         print("Enter cache size")
-        s = raw_input()
+        s = input()
         if (re.match( '\d+', s)):
             return int(s)
         else:
@@ -16,7 +17,7 @@ def get_threads():
     tab=[]
     print("Enter data size for each threads, press <Return> when finished")
     while(True):
-        s = raw_input()
+        s = input()
         if (re.match( '\d+', s)):
             tab.append(int(s))
         elif (re.match('^$', s)):
@@ -36,8 +37,8 @@ C = get_cache()
 tab = get_threads()
 N = len(tab)
 
-Bm = 5.5
-Bc = 20
+Bm = 13
+Bc = 40
 
 # index of array
 i = 0
@@ -63,7 +64,7 @@ print(tab_str)
 if(i == -1):
     print("Every thread is in full miss")
 else:
-    print("Last thread with full hits is number {0} ".format(i))
+    print("Last thread with full hits is number {0} ".format(i+1))
 
 
 
