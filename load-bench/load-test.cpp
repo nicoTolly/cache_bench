@@ -113,10 +113,13 @@ int main(int argc, char ** argv)
 	thrTab = (pthread_t *)malloc(param->nbThread * sizeof(pthread_t));
 	
 	*thrTab= pthread_self();
+	// we don't want threads to start before having been
+	// pinned, so we put a barrier
 	pthread_barrier_init(&bar, NULL, param->nbThread);
 	args_t hargs[param->nbThread];
 
-	//array for timestamp
+	//array for timestamp (in order to get global throughput
+	// at the end)
 	double *times = new double[param->nbThread];
 	
 
@@ -258,6 +261,7 @@ int main(int argc, char ** argv)
 
 	//free param
 	delete param;
+	delete[] times;
 	free(thrTab);
 	free(oldtab);
 	return 0;
@@ -268,6 +272,8 @@ int main(int argc, char ** argv)
 void * handler(void * arg)
 {
 	args_t * args = (args_t *) arg;
+	//size of data that are to be loaded 
+	//by this thread
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 
@@ -315,45 +321,6 @@ char * align_ptr(char * t, intptr_t n)
 	return (char *)ptr;
 }
 
-/*
-void load_asm(double * t, int n, int k)
-{
-	asm(
-			
-//"			movq %0, %%rsi;"
-"			movq %1, %%rbx;"
-"			movq %2, %%rdx;"
-
-"			movq $0, %%rcx;"
-"			cmpq %%rdx, %%rcx;"
-"			jge 4f;"
-
-
-"			1:;"
-"			movq $0, %%rcx;"
-"			cmpq %%rdx, %%rcx;"
-"			jge 3f;"
-
-"			2:;"
-"			addq $1, %%rax;"
-"			cmpq %%rbx, %%rax;"
-"			jl 1b;"
-
-
-"			3:;"
-
-"			addq $1, %%rcx;"
-"			cmpq %%rcx, %%rdx;"
-"			jl 1b;"
-			
-"			4:;"
-			
-	:	
-	: "g"(t),  "g"(n),  "g"(k)
-	: "%rsi","%rax", "%rbx", "%rcx", "%rdx"
-	); 
-}
-*/
 
 void load_asm(double const * t, intptr_t n, intptr_t k) 
 {

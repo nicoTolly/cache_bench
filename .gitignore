@@ -16,10 +16,12 @@ load.db
 
 omp_bench/bench_omp
 
-diff-threads/load
-diff-threads/load.db
+load-bench/load
+load-bench/load.db
 
 
-diff-threads/debug_obj/*
-diff-threads/release_obj/*
-diff-threads/bin/*
+load-bench/debug_obj/*
+load-bench/release_obj/*
+load-bench/bin/*
+
+load-bench/results.txt

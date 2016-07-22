@@ -2,6 +2,13 @@
 
 import math
 
+# generate thread size according
+# some polynomial law.
+# Example : 4, 1000, 2 
+# generates sizes of 1000 * 1 ^ 2 = 1000
+# 1000 * 2 ^ 2 = 4000
+# 1000 * 3 ^ 2 = 9000
+# 1000 * 4 ^ 2 = 16000
 
 def get_input():
     while(True):
