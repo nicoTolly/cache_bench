@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "utils.h"
 
+#include <algorithm>
 
 #define K (1<<8)
 void * handler(void * arg);
@@ -24,6 +25,7 @@ ThrParam *param;
 typedef struct 
 {
 	double *t;
+	double * time;
 	pthread_barrier_t * bar;
 	long size;
 	long niter;
@@ -114,6 +116,10 @@ int main(int argc, char ** argv)
 	pthread_barrier_init(&bar, NULL, param->nbThread);
 	args_t hargs[param->nbThread];
 
+	//array for timestamp
+	double *times = new double[param->nbThread];
+	
+
 
 	if (param->thrSizes == NULL)
 	{
@@ -132,6 +138,7 @@ int main(int argc, char ** argv)
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->fsiz; 
 			hargs[i].niter = K; 
+			hargs[i].time = times + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 			offset +=  param->fsiz;
 		}
@@ -142,6 +149,7 @@ int main(int argc, char ** argv)
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->ssiz; 
 			hargs[i].niter = K; 
+			hargs[i].time = times + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 			offset +=  param->ssiz;
 		}
@@ -158,6 +166,7 @@ int main(int argc, char ** argv)
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->thrSizes[i]; 
 			hargs[i].niter = K; 
+			hargs[i].time = times + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 			offset +=  param->thrSizes[i];
 		}
@@ -214,6 +223,7 @@ int main(int argc, char ** argv)
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
 	hargs[0].niter = K; 
+	hargs[0].time = times ; 
 	if (param->thrSizes == NULL)
 	{
 		if(param->nbThread == param->nbSlow)
@@ -241,7 +251,10 @@ int main(int argc, char ** argv)
 		pthread_join(thrTab[k], NULL);
 		*/
 	
+	double maxtime = *(std::max_element(times, times + param->nbThread));
 
+	double ld = sizeof(double) * param->globsiz * K ;
+	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
 
 	//free param
 	delete param;
@@ -266,8 +279,9 @@ void * handler(void * arg)
 	time = mysecond();
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
+	*(args->time) = time;
 	printf("Fast thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput : %f %cB/s \n", args->size * sizeof(double), time, siz_d(ld / time), units_d(ld / time));
+Throughput : %f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }
@@ -288,7 +302,7 @@ void * handler_slw(void * arg)
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	printf("Slow thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput :%f %cB/s \n", args->size * sizeof(double), time, siz_d(ld / time), units_d(ld / time));
+Throughput :%f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 	return NULL;
 }
 
