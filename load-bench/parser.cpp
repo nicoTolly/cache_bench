@@ -220,6 +220,10 @@ ThrParam::~ThrParam()
 
 
 // function for parsing main arguments
+// also calls procedure for getting
+// user's inputs.
+// Initialize param according to both
+// arguments and inputs
 int parseArg(int argc, char * args[], ThrParam **param)
 {
 	int nbThread=-1, nbSlow=0;

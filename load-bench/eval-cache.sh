@@ -1,4 +1,8 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+# get number of full hits threads
+# with inputs
+
 
 DEFAULT_INPUT=inputs.txt
 

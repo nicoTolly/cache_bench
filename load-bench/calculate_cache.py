@@ -2,6 +2,13 @@
 import re
 
 
+# this script compute the number of threads
+# supposed to be in full hits according to
+# our model. Inputs are first cache size,
+# then a blank line, every thread size (one
+# per line) and then another blank line to confirm
+# could be passed in standard input, like 
+# cat inputs | ./calculate_cache.py
 
 def get_cache():
     while(True):

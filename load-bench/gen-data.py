@@ -2,6 +2,11 @@
 
 import math
 import subprocess
+import os
+
+# Generate some datas from benchmark
+# with increasing sizes of array in inputs
+# store them (thread size then throughput) into results.txt
 
 fname = 'thread-sizes.txt'
 rname = "results6.txt"
@@ -43,3 +48,4 @@ for i in range(12):
         f.write('{0}\n'.format(size * 2))
     f.write('')
 f.close()
+os.remove(fname)
