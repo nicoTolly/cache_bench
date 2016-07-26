@@ -4,9 +4,9 @@ import math
 import subprocess
 
 fname = 'thread-sizes.txt'
-rname = "results.txt"
+rname = "results6.txt"
 
-nbThr = 1
+nbThr = 4
 
 def gendata(size, f):
     arr = []
@@ -28,8 +28,9 @@ def gendata(size, f):
 
 f = open(fname, 'w+')
 
+nbset = 6144 * 1024 / 12
 for i in range(nbThr):
-    f.write('{0}\n'.format( pow(2, 10)))
+    f.write('{0}\n'.format(nbset))
 f.write('')
 
 for i in range(12):
