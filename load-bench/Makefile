@@ -1,6 +1,6 @@
 CC=g++
 DEBUG=
-HWLOC=yes
+HWLOC=
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx 
@@ -14,7 +14,7 @@ endif
 
 
 SRC= load-test.cpp parser.cpp utils.cpp
-LDFLAGS= -lpthread -lrt 
+LDFLAGS= -lpthread -lrt -lhugetlbfs
 
 ifeq ($(HWLOC), yes)
 	CXXFLAGS+= "-DHWLOC"

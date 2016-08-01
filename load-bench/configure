@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+
+mkdir release_obj
+mkdir debug_obj

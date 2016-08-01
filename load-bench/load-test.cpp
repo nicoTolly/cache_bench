@@ -14,6 +14,7 @@ void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
 void __attribute__((optimize("O0"))) load_asm(double const * t, intptr_t n, intptr_t k) ;
 void __attribute__((optimize("O0"))) load_asm_slw(double const * t, intptr_t n, intptr_t k) ;
+inline unsigned long get_cycles();
 
 __m256d trash;
 
@@ -29,6 +30,7 @@ typedef struct
 	pthread_barrier_t * bar;
 	long size;
 	long niter;
+	unsigned long *cycle;
 } args_t;
 
 
@@ -103,7 +105,7 @@ int main(int argc, char ** argv)
 
 
 	printf(HLINE);
-	unsigned int bytes= param->globsiz * sizeof(double);
+	unsigned int bytes = param->globsiz * sizeof(double);
 	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
@@ -121,6 +123,7 @@ int main(int argc, char ** argv)
 	//array for timestamp (in order to get global throughput
 	// at the end)
 	double *times = new double[param->nbThread];
+	unsigned long *cycles = new unsigned long[param->nbThread];
 	
 
 
@@ -142,6 +145,7 @@ int main(int argc, char ** argv)
 			hargs[i].size = param->fsiz; 
 			hargs[i].niter = K; 
 			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 			offset +=  param->fsiz;
 		}
@@ -153,6 +157,7 @@ int main(int argc, char ** argv)
 			hargs[i].size = param->ssiz; 
 			hargs[i].niter = K; 
 			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 			offset +=  param->ssiz;
 		}
@@ -170,6 +175,7 @@ int main(int argc, char ** argv)
 			hargs[i].size = param->thrSizes[i]; 
 			hargs[i].niter = K; 
 			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
 			offset +=  param->thrSizes[i];
 		}
@@ -227,6 +233,7 @@ int main(int argc, char ** argv)
 	hargs[0].bar = &bar; 
 	hargs[0].niter = K; 
 	hargs[0].time = times ; 
+	hargs[0].cycle = cycles; 
 	if (param->thrSizes == NULL)
 	{
 		if(param->nbThread == param->nbSlow)
@@ -255,13 +262,17 @@ int main(int argc, char ** argv)
 		*/
 	
 	double maxtime = *(std::max_element(times, times + param->nbThread));
+	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
 
 	double ld = sizeof(double) * param->globsiz * K ;
 	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
+	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
+	printf("Estimated frequence : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
 
 	//free param
 	delete param;
 	delete[] times;
+	delete[] cycles;
 	free(thrTab);
 	free(oldtab);
 	return 0;
@@ -276,16 +287,20 @@ void * handler(void * arg)
 	//by this thread
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
+	unsigned long cyc; 
 
 
 	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
 
 
+	cyc = get_cycles();
 	time = mysecond();
 	load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
+	cyc = get_cycles() - cyc;
 	*(args->time) = time;
+	*(args->cycle) = cyc;
 	printf("Fast thread has taken %11.8f s to execute, data : %ld bytes\n \
 Throughput : %f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 
@@ -516,3 +531,24 @@ void load_asm_slw(double const * t, intptr_t n, intptr_t k)
 	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
 }
 
+inline unsigned long get_cycles()
+{
+	uint32_t eax = 0, edx;
+
+	__asm__ __volatile__(
+			//get informations on cpu
+			"cpuid;"
+			// get timestamp since last reset
+			"rdtsc;"
+			: "+a" (eax), "=d" (edx)
+			:
+			: "%rcx", "%rbx", "memory");
+
+	__asm__ __volatile__("xorl %%eax, %%eax;"
+			"cpuid;"
+			:
+			:
+			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
+
+	return (((uint64_t)edx << 32) | eax);
+}
