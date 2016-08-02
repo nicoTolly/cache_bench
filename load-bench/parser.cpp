@@ -356,11 +356,13 @@ int getSizes(int ** thr, int * nbT)
 	string res;
 	std::list <int>sizList;
 	std::list<int>::iterator iter;
+	// get input from user
+	// only break when getting an empty line
 	while(true)
 	{
 		cout << "Enter data size for each thread :" << endl ;
 		getline(cin, res);
-		if (res.empty())
+		if (res.empty() || cin.eof() )
 			break;
 		else
 		{
@@ -369,7 +371,7 @@ int getSizes(int ** thr, int * nbT)
 				size = stoi(res, NULL);
 				if (size < 0)
 				{
-					cout << "must be a positive number" << endl;
+					throw std::invalid_argument("negative number");
 					continue;
 				}
 				nbThread++;
@@ -377,7 +379,7 @@ int getSizes(int ** thr, int * nbT)
 			}
 			catch(std::invalid_argument)
 			{
-				cout << "must be a positive number" << endl;
+				cout << "must be a (positive) integer" << endl;
 			}
 		}
 	}

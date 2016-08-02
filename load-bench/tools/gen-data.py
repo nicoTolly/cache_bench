@@ -6,10 +6,11 @@ import os
 
 # Generate some datas from benchmark
 # with increasing sizes of array in inputs
-# store them (thread size then throughput) into results.txt
+# store them (thread size then throughput) into results<nb_threads>.txt
 
 fname = 'thread-sizes.txt'
 rname = "results"
+binpath = "../load"
 
 nbThr = 1
 
@@ -21,7 +22,7 @@ def gendata(size, f):
     with open(fname, 'r') as f:
         for j in range(15):
             f.seek(0)
-            load = subprocess.Popen(["./load"],  stdin=f, stdout=subprocess.PIPE)
+            load = subprocess.Popen([binpath],  stdin=f, stdout=subprocess.PIPE)
             awk = subprocess.Popen(["awk", "/throughput/ {print $4}"],  stdin=load.stdout, stdout=subprocess.PIPE, universal_newlines=True )
             load.stdout.close()
             output = awk.communicate()[0]

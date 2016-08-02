@@ -115,7 +115,7 @@ int main(int argc, char ** argv)
 	thrTab = (pthread_t *)malloc(param->nbThread * sizeof(pthread_t));
 	
 	*thrTab= pthread_self();
-	// we don't want threads to start before having been
+	// we don't want threads to start loading before having been
 	// pinned, so we put a barrier
 	pthread_barrier_init(&bar, NULL, param->nbThread);
 	args_t hargs[param->nbThread];
@@ -132,6 +132,8 @@ int main(int argc, char ** argv)
 
 
 		int i;
+		// this offset will be incremented by the size
+		// of the array we want our thread to work on
 		intptr_t offset = 0;
 		if (param->nbSlow == param->nbThread)
 			offset += param->ssiz;
@@ -140,6 +142,7 @@ int main(int argc, char ** argv)
 
 		for(i = 1; i < nbFst; i++)
 		{
+			//address of data start for this thread
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->fsiz; 
@@ -247,6 +250,7 @@ int main(int argc, char ** argv)
 			handler((void *)&hargs[0]);
 		}
 	}
+	//case user had entered thread sizes as inputs
 	else
 	{
 		hargs[0].size = param->thrSizes[0];
@@ -312,16 +316,21 @@ void * handler_slw(void * arg)
 	args_t * args = (args_t *) arg;
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
+	unsigned long cyc; 
 
 
 	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
 
 
+	cyc = get_cycles();
 	time = mysecond();
-	//load_asm_slw(args->t, args->size, args->niter);
-	load_asm(args->t, args->size, args->niter);
+	load_asm_slw(args->t, args->size, args->niter);
+	//load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
+	cyc = get_cycles() - cyc;
+	*(args->time) = time;
+	*(args->cycle) = cyc;
 	printf("Slow thread has taken %11.8f s to execute, data : %ld bytes\n \
 Throughput :%f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 	return NULL;
@@ -339,8 +348,6 @@ char * align_ptr(char * t, intptr_t n)
 
 void load_asm(double const * t, intptr_t n, intptr_t k) 
 {
-	//prevent dead code optimization
-	trash=_mm256_setzero_pd(); 
 	assert(n%4 == 0);
 	__m256d ldvec= {0,0,0,0};
 	intptr_t nbvloads= 0;
@@ -399,8 +406,6 @@ void load_asm(double const * t, intptr_t n, intptr_t k)
 
 void load_asm_slw(double const * t, intptr_t n, intptr_t k) 
 {
-	//prevent dead code optimization
-	trash=_mm256_setzero_pd(); 
 	assert(n%4 == 0);
 	__m256d ldvec= {0,0,0,0};
 	intptr_t nbvloads= 0;
