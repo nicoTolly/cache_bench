@@ -6,6 +6,9 @@
 #include <stdint.h>
 #include <assert.h>
 #include <time.h>
+#include <iostream>
+#include <fstream>
+#include <regex>
 
 #define M 20
 # define HLINE "-------------------------------------------------------------\n"
@@ -24,3 +27,5 @@ double siz_d(double n);
 inline unsigned long get_cycles();
 int checktick();
 double mysecond();
+void print_status();
+

@@ -1,6 +1,7 @@
 CC=g++
 DEBUG=
 HWLOC=
+HUGEPAGES=yes
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx 
@@ -21,6 +22,9 @@ ifeq ($(HWLOC), yes)
 	LDFLAGS+=-lhwloc
 endif
 
+ifeq ($(HUGEPAGES), yes)
+	CXXFLAGS+= "-DUSE_HUGE"
+endif
 
 PROJECT_ROOT_DIR= $(shell pwd)
 

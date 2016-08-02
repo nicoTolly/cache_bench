@@ -1,5 +1,7 @@
 #include "utils.h"
 
+using namespace std;
+
 //getting units (kibi, mebi, gibi...) from a number
 char units(unsigned int n)
 { int frac;
@@ -138,3 +140,17 @@ double siz_d( double f)
 }
 
 
+// check hugepages use
+// by printing the content of /proc/self/status
+void print_status()
+{
+	string line;
+	ifstream file;
+	file.open("/proc/self/status");
+	while(getline (file, line))
+	{
+		if(regex_match(line, std::regex(".*HugetlbPages.*") ))
+			cout << line << endl;
+	}
+	file.close();
+}

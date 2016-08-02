@@ -8,6 +8,17 @@
 
 #include <algorithm>
 
+
+//#ifdef __gnu_linux__
+#if defined(__gnu_linux__) && defined(USE_HUGE) 
+#include <sys/mman.h>
+// these macros should have been defined
+// but strangely, they are not
+#define HUGE_MAP_1GB (30 << MAP_HUGE_SHIFT)
+#define HUGE_MAP_2MB (21 << MAP_HUGE_SHIFT)
+#define HUGE_MAP HUGE_MAP_1GB
+#endif
+
 #define K (1<<8)
 void * handler(void * arg);
 void * handler_slw(void * arg);
@@ -86,7 +97,18 @@ int main(int argc, char ** argv)
 
 	int nbFst = param->nbThread - param->nbSlow;
 	//initializing tab containing data to be loaded
+#if defined(__gnu_linux__) && defined(USE_HUGE) 
+	void * ptrvoid = mmap(NULL, (param->globsiz + 8) * sizeof(double), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | HUGE_MAP , -1, 0 );
+	if (ptrvoid == MAP_FAILED)
+	{
+		cout << "could not allocate tab with mmap" << endl;
+		exit(EXIT_FAILURE);
+	}
+	tab = (double *) ptrvoid;
+
+#else
 	tab = new double[param->globsiz + 8];
+#endif
 	if(tab == NULL)
 	{
 		cout << "could not allocate tab" << endl;
@@ -98,11 +120,14 @@ int main(int argc, char ** argv)
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
 #pragma omp for
-	for (long i = 0; i <  param->globsiz; i++)
+	for (size_t i = 0; i <  param->globsiz; i++)
 	{
 		tab[i]= 3.4;
 	}
 
+	printf(HLINE);
+	print_status();
+	printf(HLINE);
 
 	printf(HLINE);
 	unsigned int bytes = param->globsiz * sizeof(double);
@@ -274,11 +299,16 @@ int main(int argc, char ** argv)
 	printf("Estimated frequence : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
 
 	//free param
-	delete param;
 	delete[] times;
 	delete[] cycles;
 	free(thrTab);
+#if defined(__gnu_linux__) && defined(USE_HUGE) 
+	munmap((void *)oldtab, ((param->globsiz + 8) * sizeof(double) ));
+	//munmap((void *)oldtab, std::min((size_t)(1 << 27), ((param->globsiz + 8) * sizeof(double))));
+#else
 	free(oldtab);
+#endif
+	delete param;
 	return 0;
 }
 

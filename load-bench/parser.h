@@ -29,7 +29,7 @@ class ThrParam
 	//every fields
 	
 	
-	long globsiz;
+	size_t globsiz;
 	//standard size of array
 	long fsiz;
 	//standard size of array

@@ -8,6 +8,15 @@ If you do have hwloc installed, set HWLOC in Makefile to "yes". It will then
 guess the number of cpu per socket. Else, set CPU_PER_SOCK in parser.h.
 Default is 4.
 
+If you want to use huge pages, set HUGEPAGES to "yes" in Makefile. if you want to use 
+special hugepages (for example 1GB pages that are allowed on some architectures) make
+sure you have reserved them before.
+Hugepages can be reserved with the tool hugeadm, which is a wrapper for writing and reading
+in this directory /sys/kernel/mm/hugepages/hugepages-<huge pages sizes>/
+These files can also be directly written.
+
+Reserving hugepages requires root priviledges.
+
 
 Usage :
 
