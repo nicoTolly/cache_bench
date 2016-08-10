@@ -415,7 +415,7 @@ void load_asm(double const * t, intptr_t n, intptr_t k)
 
 
 			"2:;"
-			"vmovapd %%ymm1, %0;"
+			//"vmovapd %%ymm1, %0;"
 
 			//outer loop test
 			"addq $1, %%rbx;"
