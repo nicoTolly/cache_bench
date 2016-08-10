@@ -98,6 +98,7 @@ int main(int argc, char ** argv)
 	int nbFst = param->nbThread - param->nbSlow;
 	//initializing tab containing data to be loaded
 #if defined(__gnu_linux__) && defined(USE_HUGE) 
+	//using mmap for allocating hugepages
 	void * ptrvoid = mmap(NULL, (param->globsiz + 8) * sizeof(double), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | HUGE_MAP , -1, 0 );
 	if (ptrvoid == MAP_FAILED)
 	{
