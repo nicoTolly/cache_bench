@@ -1,6 +1,6 @@
 CC=g++
 DEBUG=
-HWLOC=yes
+HWLOC=
 HUGEPAGES=
 
 ifeq ($(DEBUG),yes)
