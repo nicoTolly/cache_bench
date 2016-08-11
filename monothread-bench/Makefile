@@ -1,6 +1,6 @@
 CC=g++
 DEBUG=
-HWLOC=yes
+HWLOC=
 HUGEPAGES=
 
 ifeq ($(DEBUG),yes)
@@ -14,16 +14,16 @@ endif
 
 
 
-SRC= load-test.cpp parser.cpp utils.cpp
+SRC= load-test.cpp utils.cpp
 LDFLAGS= -lpthread -lrt 
 
 ifeq ($(HWLOC), yes)
-	CXXFLAGS+= -DHWLOC
+	CXXFLAGS+= "-DHWLOC"
 	LDFLAGS+=-lhwloc
 endif
 
 ifeq ($(HUGEPAGES), yes)
-	CXXFLAGS+= -DUSE_HUGE
+	CXXFLAGS+= "-DUSE_HUGE"
 	LDFLAGS+=-lhugetlbfs
 endif
 

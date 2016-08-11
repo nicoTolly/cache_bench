@@ -28,3 +28,11 @@ load-bench/results.txt
 
 bandwidth-1.3.1/*.o
 bandwidth-1.3.1/bandwidth*
+
+
+monothread-bench/load
+monothread-bench/load.db
+
+
+monothread-bench/debug_obj/*
+monothread-bench/release_obj/*

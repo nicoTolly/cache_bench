@@ -3,7 +3,6 @@
 #include <pthread.h>
 #include <assert.h>
 #include <immintrin.h>
-#include "parser.h"
 #include "utils.h"
 
 #include <algorithm>
@@ -19,7 +18,8 @@
 #define HUGE_MAP HUGE_MAP_1GB
 #endif
 
-#define K (1<<8)
+#define NTAB (1<<23)
+#define K (1<<10)
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
@@ -30,7 +30,6 @@ inline unsigned long get_cycles();
 
 __m256d trash;
 
-ThrParam *param;
 
 
 //arguments passed
@@ -39,21 +38,19 @@ typedef struct
 {
 	double *t;
 	double * time;
-	pthread_barrier_t * bar;
 	long size;
 	long niter;
 	unsigned long *cycle;
 } args_t;
 
 
-
+using namespace std;
 
 
 int main(int argc, char ** argv)
 {
 	double * tab;
-	pthread_t * thrTab;
-	pthread_barrier_t bar;
+
 
 
 	int quantum;
@@ -63,6 +60,7 @@ int main(int argc, char ** argv)
 	//Parsing args and initializing param
 	//in order to get number of threads,
 	//slow threads, places, etc.
+	/*
 	int ret = parseArg(argc, argv,  &param);
 	if (ret < 0)
 	{
@@ -76,6 +74,7 @@ int main(int argc, char ** argv)
 	}
 
 	param->info();
+	*/
 	
 
 
@@ -96,7 +95,6 @@ int main(int argc, char ** argv)
 	
 
 
-	int nbFst = param->nbThread - param->nbSlow;
 	//initializing tab containing data to be loaded
 #if defined(__gnu_linux__) && defined(USE_HUGE) 
 	//using mmap for allocating hugepages
@@ -109,7 +107,7 @@ int main(int argc, char ** argv)
 	tab = (double *) ptrvoid;
 
 #else
-	tab = new double[param->globsiz + 8];
+	tab = new double[NTAB + 8];
 #endif
 	if(tab == NULL)
 	{
@@ -122,196 +120,46 @@ int main(int argc, char ** argv)
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
 #pragma omp for
-	for (size_t i = 0; i <  param->globsiz; i++)
+	for (size_t i = 0; i <  NTAB; i++)
 	{
 		tab[i]= 3.4;
 	}
 
-	printf(HLINE);
-	print_status();
-	printf(HLINE);
 
 	printf(HLINE);
-	unsigned int bytes = param->globsiz * sizeof(double);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
+	unsigned int bytes = NTAB * sizeof(double);
+	printf("N = %ld, 1 threads will be called, loading %d%c bytes of data %d times\n", NTAB, siz(bytes), units(bytes), K);
 	printf(HLINE);
 
 
+	args_t hargs;
 
-	// array that will contain pthread identifiers
-	thrTab = (pthread_t *)malloc(param->nbThread * sizeof(pthread_t));
-	
-	*thrTab= pthread_self();
-	// we don't want threads to start loading before having been
-	// pinned, so we put a barrier
-	pthread_barrier_init(&bar, NULL, param->nbThread);
-	args_t hargs[param->nbThread];
+	double time;
+	unsigned long cycle;
 
-	//array for timestamp (in order to get global throughput
-	// at the end)
-	double *times = new double[param->nbThread];
-	unsigned long *cycles = new unsigned long[param->nbThread];
-	
-
-
-	if (param->thrSizes == NULL)
-	{
-
-
-		int i;
-		// this offset will be incremented by the size
-		// of the array we want our thread to work on
-		intptr_t offset = 0;
-		if (param->nbSlow == param->nbThread)
-			offset += param->ssiz;
-		else
-			offset += param->fsiz;
-
-		for(i = 1; i < nbFst; i++)
-		{
-			//address of data start for this thread
-			hargs[i].t = tab + offset;
-			hargs[i].bar = &bar; 
-			hargs[i].size = param->fsiz; 
-			hargs[i].niter = K; 
-			hargs[i].time = times + i; 
-			hargs[i].cycle = cycles + i; 
-			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
-			offset +=  param->fsiz;
-		}
-
-		for(; i < param->nbThread; i++)
-		{
-			hargs[i].t = tab + offset;
-			hargs[i].bar = &bar; 
-			hargs[i].size = param->ssiz; 
-			hargs[i].niter = K; 
-			hargs[i].time = times + i; 
-			hargs[i].cycle = cycles + i; 
-			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
-			offset +=  param->ssiz;
-		}
-
-	}
-	// thrSizes is set
-	// user has entered data sizes
-	else
-	{
-		intptr_t offset = param->thrSizes[0];
-		for(int i = 1; i < param->nbThread; i++)
-		{
-			hargs[i].t = tab + offset;
-			hargs[i].bar = &bar; 
-			hargs[i].size = param->thrSizes[i]; 
-			hargs[i].niter = K; 
-			hargs[i].time = times + i; 
-			hargs[i].cycle = cycles + i; 
-			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
-			offset +=  param->thrSizes[i];
-		}
-	}
-
-
-
-	//Placing threads on appropriate cpu
-	//If either fstThrList or slwThrList
-	//is set to null, then it means that 
-	//all threads are either fast or slow
-	if (param->fstThrList != NULL)
-	{
-		int s;
-		cpu_set_t sets[nbFst];
-		for (int k = 0; k < nbFst; k++)
-		{
-			CPU_ZERO(&sets[k]);
-			CPU_SET(param->fstThrList[k], &sets[k]);
-			printf("fast thread [%d] pinned on cpu %d\n", k, param->fstThrList[k]);
-			s = pthread_setaffinity_np(thrTab[k],sizeof(cpu_set_t), &sets[k]);
-			if (s != 0)
-			{
-				printf("could not set affinity\n");
-				exit(EXIT_FAILURE);
-			}
-		}
-		
-	}
-
-	if (param->slwThrList != NULL)
-	{
-		int s;
-		cpu_set_t sets[param->nbSlow];
-		for (int k = 0; k < param->nbSlow; k++)
-		{
-			CPU_ZERO(&sets[k]);
-			CPU_SET(param->slwThrList[k], &sets[k]);
-			s = pthread_setaffinity_np(thrTab[nbFst + k],sizeof(cpu_set_t), &sets[k]);
-			if (s != 0)
-			{
-				printf("could not set affinity\n");
-				exit(EXIT_FAILURE);
-			}
-			printf("Slow thread [%d] pinned on cpu %d\n", k, param->slwThrList[k]);
-		}
-
-	}
-
-
-	// launching main thread
-	// slow threads if there is 
-	// no fast thread
-	// fast thread otherwise
-	hargs[0].t = tab ;
-	hargs[0].bar = &bar; 
-	hargs[0].niter = K; 
-	hargs[0].time = times ; 
-	hargs[0].cycle = cycles; 
-	if (param->thrSizes == NULL)
-	{
-		if(param->nbThread == param->nbSlow)
-		{
-			hargs[0].size = param->ssiz; 
-			handler_slw((void *)&hargs[0]);
-		}
-		else
-		{
-			hargs[0].size = param->fsiz; 
-			handler((void *)&hargs[0]);
-		}
-	}
+	hargs.t = tab ;
+	hargs.niter = K; 
+	hargs.time = &time ; 
+	hargs.cycle = &cycle; 
+	hargs.size = NTAB ;
+	handler((void *)&hargs);
 	//case user had entered thread sizes as inputs
-	else
-	{
-		hargs[0].size = param->thrSizes[0];
-		handler((void *)&hargs[0]);
-	}
 
 
-	for (int k = 0; k < param->nbThread; k++)
-		pthread_join(thrTab[k], NULL);
-	/*
-	for (int k = 0; k < nbFst; k++)
-		pthread_join(thrTab[k], NULL);
-		*/
 	
-	double maxtime = *(std::max_element(times, times + param->nbThread));
-	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
 
-	double ld = sizeof(double) * param->globsiz * K ;
-	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
-	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
-	printf("Estimated frequence : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
+	double ld = sizeof(double) * NTAB * K ;
+	printf("Global throughput : %f %cB/s\n", siz_d(ld / time), units_d(ld / time));
+	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / cycle), units_d(ld / cycle));
+	printf("Estimated frequence : %f %cHz\n", siz_d(cycle / time), units_d(cycle / time));
 
 	//free param
-	delete[] times;
-	delete[] cycles;
-	free(thrTab);
 #if defined(__gnu_linux__) && defined(USE_HUGE) 
 	munmap((void *)oldtab, ((param->globsiz + 8) * sizeof(double) ));
 	//munmap((void *)oldtab, std::min((size_t)(1 << 27), ((param->globsiz + 8) * sizeof(double))));
 #else
 	free(oldtab);
 #endif
-	delete param;
 	return 0;
 }
 
@@ -327,8 +175,15 @@ void * handler(void * arg)
 	unsigned long cyc; 
 
 
-	// barrier (waiting for everyone to be pinned)
-	pthread_barrier_wait(args->bar);
+	cpu_set_t sets;
+	CPU_ZERO(&sets);
+	CPU_SET(0, &sets);
+	int s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
 
 
 	cyc = get_cycles();
@@ -353,8 +208,6 @@ void * handler_slw(void * arg)
 	unsigned long cyc; 
 
 
-	// barrier (waiting for everyone to be pinned)
-	pthread_barrier_wait(args->bar);
 
 
 	cyc = get_cycles();

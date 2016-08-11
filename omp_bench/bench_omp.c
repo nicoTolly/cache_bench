@@ -18,8 +18,8 @@
 #include <assert.h>
 #include <time.h>
 
-# define N	(1<<16)
-# define K	(1<<12)
+# define N	(1<<23)
+# define K	(1<<10)
 # define NTIMES	10
 # define OFFSET	0
 
