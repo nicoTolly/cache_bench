@@ -109,7 +109,7 @@ ThrParam::ThrParam(int nbT, int **thrS):fsiz(NDEFAULT),ssiz(NDEFAULT), nbSlow(0)
 
 	for (int i =0; i < nbThread; i++)
 	{
-		thrSizes[i] &= ~0x3;
+		thrSizes[i] &= ~0x3F;
 	}
 
 

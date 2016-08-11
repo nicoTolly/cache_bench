@@ -15,7 +15,7 @@ endif
 
 
 SRC= load-test.cpp parser.cpp utils.cpp
-LDFLAGS= -lpthread -lrt -lhugetlbfs
+LDFLAGS= -lpthread -lrt 
 
 ifeq ($(HWLOC), yes)
 	CXXFLAGS+= "-DHWLOC"
@@ -24,6 +24,7 @@ endif
 
 ifeq ($(HUGEPAGES), yes)
 	CXXFLAGS+= "-DUSE_HUGE"
+	LDFLAGS+=-lhugetlbfs
 endif
 
 PROJECT_ROOT_DIR= $(shell pwd)
