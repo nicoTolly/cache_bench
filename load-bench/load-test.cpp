@@ -19,7 +19,7 @@
 #define HUGE_MAP HUGE_MAP_1GB
 #endif
 
-#define K (1<<8)
+#define K (1<<10)
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
@@ -308,7 +308,7 @@ int main(int argc, char ** argv)
 	double ld = sizeof(double) * param->globsiz * K ;
 	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
 	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
-	printf("Estimated frequence : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
+	printf("Estimated frequency : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
 
 	//free param
 	delete[] times;
