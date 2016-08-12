@@ -92,6 +92,15 @@ int main(int argc, char ** argv)
 		printf("Your clock granularity appears to be "
 				"less than one microsecond.\n");
 	
+	cpu_set_t sets;
+	CPU_ZERO(&sets);
+	CPU_SET(0, &sets);
+	int s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
 	
 
 
@@ -174,6 +183,7 @@ void * handler(void * arg)
 	double time;
 	unsigned long cyc; 
 
+	/*
 
 	cpu_set_t sets;
 	CPU_ZERO(&sets);
@@ -185,6 +195,7 @@ void * handler(void * arg)
 		exit(EXIT_FAILURE);
 	}
 
+	*/
 
 	cyc = get_cycles();
 	time = mysecond();

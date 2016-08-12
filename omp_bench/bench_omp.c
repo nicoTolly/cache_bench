@@ -4,6 +4,7 @@
  * memory and cache, with several
  * threads doing vload.
  */
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <math.h>
@@ -14,12 +15,13 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <immintrin.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <assert.h>
 #include <time.h>
 
-# define N	(1<<23)
-# define K	(1<<10)
+# define N	(1<<14)
+# define K	(1<<8)
 # define NTIMES	10
 # define OFFSET	0
 
@@ -113,12 +115,28 @@ int main()
 		printf("Your clock granularity appears to be "
 				"less than one microsecond.\n");
 
-
 #pragma omp parallel
 	{
 		nTh = omp_get_num_threads();
 	}
+	nTh = 8;
 	double		  timesPerTh[NTIMES][nTh];
+	
+	
+	
+	//pinning main thread on cpu 0
+	cpu_set_t sets;
+	CPU_ZERO(&sets);
+	CPU_SET(60, &sets);
+	int s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	//allocating tab
 
 	printf("Lauching %d threads\n", nTh);
 	arr = malloc(sizeof(double)*(N*nTh+4));
@@ -133,13 +151,22 @@ int main()
 	printf(HLINE);
 
 	//initialization
-#pragma omp for
+//#pragma omp for
 	for(int i = 0; i < nTh; i++)
 	{
 		for (int j = 0; j < N; j++)
 			arr[i*N+j]= 3.0;
 	}
 
+	//pinning main thread on cpu 0
+	CPU_ZERO(&sets);
+	CPU_SET(0, &sets);
+	s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
 
 
 	printf(HLINE);

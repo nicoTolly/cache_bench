@@ -94,6 +94,19 @@ int main(int argc, char ** argv)
 				"less than one microsecond.\n");
 	
 	
+	//pinning main thread on cpu 0 (on a numa architecture, data could 
+	// be allocated on another node otherwise)
+	cpu_set_t sets;
+	CPU_ZERO(&sets);
+	CPU_SET(0, &sets);
+	int s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	
 
 
 	int nbFst = param->nbThread - param->nbSlow;
@@ -288,10 +301,6 @@ int main(int argc, char ** argv)
 
 	for (int k = 0; k < param->nbThread; k++)
 		pthread_join(thrTab[k], NULL);
-	/*
-	for (int k = 0; k < nbFst; k++)
-		pthread_join(thrTab[k], NULL);
-		*/
 	
 	double maxtime = *(std::max_element(times, times + param->nbThread));
 	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
