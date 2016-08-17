@@ -58,6 +58,7 @@ int main(int argc, char ** argv)
 
 	int quantum;
 	int BytesPerWord;
+	long nb_iter;
 
 
 	//Parsing args and initializing param
@@ -143,10 +144,14 @@ int main(int argc, char ** argv)
 	printf(HLINE);
 	print_status();
 	printf(HLINE);
+	
+
+	// getting number of iterations, we want to do approximately 2^25 cycles
+	nb_iter = get_nb_iter(param->globsiz);
 
 	printf(HLINE);
 	unsigned int bytes = param->globsiz * sizeof(double);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), nb_iter);
 	printf(HLINE);
 
 
@@ -186,7 +191,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->fsiz; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
@@ -198,7 +203,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->ssiz; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
@@ -216,7 +221,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->thrSizes[i]; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
@@ -275,7 +280,7 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].niter = K; 
+	hargs[0].niter = nb_iter; 
 	hargs[0].time = times ; 
 	hargs[0].cycle = cycles; 
 	if (param->thrSizes == NULL)
@@ -305,7 +310,7 @@ int main(int argc, char ** argv)
 	double maxtime = *(std::max_element(times, times + param->nbThread));
 	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
 
-	double ld = sizeof(double) * param->globsiz * K ;
+	double ld = sizeof(double) * param->globsiz * nb_iter ;
 	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
 	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
 	printf("Estimated frequency : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
