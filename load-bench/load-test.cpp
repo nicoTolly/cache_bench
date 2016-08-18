@@ -23,9 +23,15 @@
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
+#ifdef USE_AVX
 void __attribute__((optimize("O0"))) load_asm(double const * t, intptr_t n, intptr_t k) ;
 void __attribute__((optimize("O0"))) load_asm2(double const * t, intptr_t n, intptr_t k) ;
 void __attribute__((optimize("O0"))) load_asm_slw(double const * t, intptr_t n, intptr_t k) ;
+#endif
+
+void __attribute__((optimize("O0"))) load_asm_sse(double const * t, intptr_t n, intptr_t k) ;
+
+
 inline unsigned long get_cycles();
 
 __m256d trash;
@@ -348,7 +354,11 @@ void * handler(void * arg)
 	cyc = get_cycles();
 	time = mysecond();
 	//load_asm(args->t, args->size, args->niter);
+#ifdef USE_AVX
 	load_asm2(args->t, args->size, args->niter);
+#else
+	load_asm_sse(args->t, args->size, args->niter);
+#endif
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
@@ -373,7 +383,10 @@ void * handler_slw(void * arg)
 
 	cyc = get_cycles();
 	time = mysecond();
+#ifdef USE_AVX
 	load_asm_slw(args->t, args->size, args->niter);
+#else
+#endif
 	//load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
@@ -393,6 +406,7 @@ char * align_ptr(char * t, intptr_t n)
 	return (char *)ptr;
 }
 
+#ifdef USE_AVX
 
 void load_asm(double const * t, intptr_t n, intptr_t k) 
 {
@@ -509,6 +523,72 @@ void load_asm2(double const * t, intptr_t n, intptr_t k)
 			: "=m" (ldvec) , "=m" ( nbvloads )
 			:"r" ( t ), "r" ( n ), "r" ( k )
 			:"%ymm1", "%rax", "%rbx"//, "%rcx"
+		     );
+	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
+}
+
+
+#endif
+
+void load_asm_sse(double const * t, intptr_t n, intptr_t k) 
+{
+	assert(n%32 == 0);
+	__m256d ldvec= {0,0,0,0};
+	intptr_t nbvloads= 0;
+	asm volatile (
+			//initialize load counter
+			//"movq $0, %%rcx;"
+			//"movq %%rcx, %1;"
+
+
+			//initialize outer loop counter
+			"movq $0, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jge 3f;"
+			
+			"4:;"
+
+			//initialize loop counter
+			"movq $0, %%rax;"
+			"cmpq %3, %%rax;"
+			"jge 2f;"
+
+
+
+			"1:;"
+			//vload from memory
+			"vmovapd (%2, %%rax, 8), %%xmm0;"
+			"vmovapd 32(%2, %%rax, 8), %%xmm1;"
+			"vmovapd 64(%2, %%rax, 8), %%xmm2;"
+			"vmovapd 96(%2, %%rax, 8), %%xmm3;"
+			"vmovapd 128(%2, %%rax, 8), %%xmm4;"
+			"vmovapd 160(%2, %%rax, 8), %%xmm5;"
+			"vmovapd 192(%2, %%rax, 8), %%xmm6;"
+			"vmovapd 224(%2, %%rax, 8), %%xmm7;"
+			//increment vload counter
+			//"addq $1, %%rcx;"
+			//increment and compare
+			"addq $16, %%rax;"
+			"cmpq %3, %%rax;"
+			"jl 1b;"
+
+
+
+			"2:;"
+			//"vmovapd %%ymm1, %0;"
+
+			//outer loop test
+			"addq $1, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jl 4b;"
+
+			"3:;"
+			//"movq %%rcx, %1;"
+
+
+			: "=m" (ldvec) , "=m" ( nbvloads )
+			:"r" ( t ), "r" ( n ), "r" ( k )
+			:"%xmm1", "%rax", "%rbx"//, "%rcx"
 		     );
 	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
 }

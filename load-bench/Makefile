@@ -1,10 +1,11 @@
 CC=g++
 DEBUG=
-HWLOC=
+HWLOC=yes
 HUGEPAGES=
+AVX=yes
 
 ifeq ($(DEBUG),yes)
-	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic  -mavx 
+	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic   
 	EXEC= load.db
 else
 	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -mavx -O3
@@ -25,6 +26,11 @@ endif
 ifeq ($(HUGEPAGES), yes)
 	CXXFLAGS+= -DUSE_HUGE
 	LDFLAGS+=-lhugetlbfs
+endif
+
+ifeq ($(AVX), yes)
+	CXXFLAGS+= -mavx
+	CXXFLAGS+= -DUSE_AVX
 endif
 
 PROJECT_ROOT_DIR= $(shell pwd)
