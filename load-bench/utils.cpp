@@ -1,5 +1,6 @@
 #include "utils.h"
 
+
 using namespace std;
 
 //getting units (kibi, mebi, gibi...) from a number
@@ -153,4 +154,18 @@ void print_status()
 			cout << line << endl;
 	}
 	file.close();
+}
+
+
+long get_nb_iter(long size)
+{
+	long k = 64;
+	if(size < 64)
+	{
+		cout << "array too small !!" << endl;
+		abort();
+	}
+	while(k * size * DOUBLE_PER_CYCLE < TOTAL_CYCLES )
+		k = k << 1;
+	return k;
 }

@@ -20,6 +20,14 @@
 # define MAX(x,y) ((x)>(y)?(x):(y))
 # endif
 
+
+# ifndef DOUBLE_PER_CYCLE
+#define DOUBLE_PER_CYCLE 2
+#endif
+
+#ifndef TOTAL_CYCLES
+#define TOTAL_CYCLES ((long)1 << 32)
+#endif
 char units(unsigned int n);
 int siz(unsigned int n);
 char units_d(double f);
@@ -28,4 +36,4 @@ inline unsigned long get_cycles();
 int checktick();
 double mysecond();
 void print_status();
-
+long get_nb_iter(long size);

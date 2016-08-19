@@ -23,9 +23,15 @@
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
+#ifdef USE_AVX
 void __attribute__((optimize("O0"))) load_asm(double const * t, intptr_t n, intptr_t k) ;
 void __attribute__((optimize("O0"))) load_asm2(double const * t, intptr_t n, intptr_t k) ;
 void __attribute__((optimize("O0"))) load_asm_slw(double const * t, intptr_t n, intptr_t k) ;
+#endif
+
+void __attribute__((optimize("O0"))) load_asm_sse(double const * t, intptr_t n, intptr_t k) ;
+
+
 inline unsigned long get_cycles();
 
 __m256d trash;
@@ -58,6 +64,7 @@ int main(int argc, char ** argv)
 
 	int quantum;
 	int BytesPerWord;
+	long nb_iter;
 
 
 	//Parsing args and initializing param
@@ -143,10 +150,14 @@ int main(int argc, char ** argv)
 	printf(HLINE);
 	print_status();
 	printf(HLINE);
+	
+
+	// getting number of iterations, we want to do approximately 2^25 cycles
+	nb_iter = get_nb_iter(param->globsiz);
 
 	printf(HLINE);
 	unsigned int bytes = param->globsiz * sizeof(double);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), K);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), nb_iter);
 	printf(HLINE);
 
 
@@ -186,7 +197,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->fsiz; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
@@ -198,7 +209,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->ssiz; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
@@ -216,7 +227,7 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->thrSizes[i]; 
-			hargs[i].niter = K; 
+			hargs[i].niter = nb_iter; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
@@ -275,7 +286,7 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].niter = K; 
+	hargs[0].niter = nb_iter; 
 	hargs[0].time = times ; 
 	hargs[0].cycle = cycles; 
 	if (param->thrSizes == NULL)
@@ -305,10 +316,10 @@ int main(int argc, char ** argv)
 	double maxtime = *(std::max_element(times, times + param->nbThread));
 	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
 
-	double ld = sizeof(double) * param->globsiz * K ;
+	double ld = sizeof(double) * param->globsiz * nb_iter ;
 	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
 	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
-	printf("Estimated frequence : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
+	printf("Estimated frequency : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
 
 	//free param
 	delete[] times;
@@ -343,7 +354,11 @@ void * handler(void * arg)
 	cyc = get_cycles();
 	time = mysecond();
 	//load_asm(args->t, args->size, args->niter);
+#ifdef USE_AVX
 	load_asm2(args->t, args->size, args->niter);
+#else
+	load_asm_sse(args->t, args->size, args->niter);
+#endif
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
@@ -368,7 +383,10 @@ void * handler_slw(void * arg)
 
 	cyc = get_cycles();
 	time = mysecond();
+#ifdef USE_AVX
 	load_asm_slw(args->t, args->size, args->niter);
+#else
+#endif
 	//load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
@@ -388,6 +406,7 @@ char * align_ptr(char * t, intptr_t n)
 	return (char *)ptr;
 }
 
+#ifdef USE_AVX
 
 void load_asm(double const * t, intptr_t n, intptr_t k) 
 {
@@ -504,6 +523,72 @@ void load_asm2(double const * t, intptr_t n, intptr_t k)
 			: "=m" (ldvec) , "=m" ( nbvloads )
 			:"r" ( t ), "r" ( n ), "r" ( k )
 			:"%ymm1", "%rax", "%rbx"//, "%rcx"
+		     );
+	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
+}
+
+
+#endif
+
+void load_asm_sse(double const * t, intptr_t n, intptr_t k) 
+{
+	assert(n%32 == 0);
+	__m256d ldvec= {0,0,0,0};
+	intptr_t nbvloads= 0;
+	asm volatile (
+			//initialize load counter
+			//"movq $0, %%rcx;"
+			//"movq %%rcx, %1;"
+
+
+			//initialize outer loop counter
+			"movq $0, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jge 3f;"
+			
+			"4:;"
+
+			//initialize loop counter
+			"movq $0, %%rax;"
+			"cmpq %3, %%rax;"
+			"jge 2f;"
+
+
+
+			"1:;"
+			//vload from memory
+			"vmovapd (%2, %%rax, 8), %%xmm0;"
+			"vmovapd 16(%2, %%rax, 8), %%xmm4;"
+			"vmovapd 32(%2, %%rax, 8), %%xmm1;"
+			"vmovapd 48(%2, %%rax, 8), %%xmm5;"
+			"vmovapd 64(%2, %%rax, 8), %%xmm2;"
+			"vmovapd 80(%2, %%rax, 8), %%xmm6;"
+			"vmovapd 96(%2, %%rax, 8), %%xmm3;"
+			"vmovapd 112(%2, %%rax, 8), %%xmm7;"
+			//increment vload counter
+			//"addq $1, %%rcx;"
+			//increment and compare
+			"addq $16, %%rax;"
+			"cmpq %3, %%rax;"
+			"jl 1b;"
+
+
+
+			"2:;"
+			//"vmovapd %%ymm1, %0;"
+
+			//outer loop test
+			"addq $1, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jl 4b;"
+
+			"3:;"
+			//"movq %%rcx, %1;"
+
+
+			: "=m" (ldvec) , "=m" ( nbvloads )
+			:"r" ( t ), "r" ( n ), "r" ( k )
+			:"%xmm1", "%rax", "%rbx"//, "%rcx"
 		     );
 	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
 }
