@@ -19,7 +19,7 @@
 #define HUGE_MAP HUGE_MAP_1GB
 #endif
 
-#define K (1<<8)
+#define K (1<<12)
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
