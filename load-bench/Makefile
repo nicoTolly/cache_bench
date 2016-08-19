@@ -2,7 +2,7 @@ CC=g++
 DEBUG=
 HWLOC=yes
 HUGEPAGES=
-AVX=
+AVX=yes
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic   

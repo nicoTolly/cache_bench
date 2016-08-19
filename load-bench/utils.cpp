@@ -169,3 +169,24 @@ long get_nb_iter(long size)
 		k = k << 1;
 	return k;
 }
+
+long * get_tab_iter(int * sizes, int nsiz)
+{
+	long * tab_iter = new long[nsiz];
+	for (int i = 0 ; i < nsiz; i++)
+	{
+		tab_iter[i] = get_nb_iter(sizes[i]);
+	}
+	return tab_iter;
+	
+}
+
+template <typename T> T array_sum(T* arr, int siz)
+{
+	T res = 0;
+	for (int i = 0; i < siz; i++)
+	{
+		res += arr[i];
+	}
+	return res;
+}

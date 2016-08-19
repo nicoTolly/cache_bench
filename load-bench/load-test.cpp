@@ -5,6 +5,7 @@
 #include <immintrin.h>
 #include "parser.h"
 #include "utils.h"
+#include <sched.h>
 
 #include <algorithm>
 
@@ -153,7 +154,22 @@ int main(int argc, char ** argv)
 	
 
 	// getting number of iterations, we want to do approximately 2^25 cycles
-	nb_iter = get_nb_iter(param->globsiz);
+
+	long * iter;
+	if (param->thrSizes != NULL)
+	{
+		iter = get_tab_iter(param->thrSizes, param->nbThread);
+		nb_iter = 0;
+		for (int i = 0; i < param->nbThread; i++)
+		{
+			nb_iter += iter[i] * param->thrSizes[i];
+		}
+	}
+	else
+	{
+		nb_iter = get_nb_iter(param->globsiz);
+	}
+
 
 	printf(HLINE);
 	unsigned int bytes = param->globsiz * sizeof(double);
@@ -227,7 +243,8 @@ int main(int argc, char ** argv)
 			hargs[i].t = tab + offset;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->thrSizes[i]; 
-			hargs[i].niter = nb_iter; 
+			//hargs[i].niter = nb_iter; 
+			hargs[i].niter = iter[i]; 
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
@@ -286,7 +303,8 @@ int main(int argc, char ** argv)
 	// fast thread otherwise
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
-	hargs[0].niter = nb_iter; 
+	//hargs[0].niter = nb_iter; 
+	hargs[0].niter = iter[0]; 
 	hargs[0].time = times ; 
 	hargs[0].cycle = cycles; 
 	if (param->thrSizes == NULL)
@@ -345,10 +363,13 @@ void * handler(void * arg)
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 	unsigned long cyc; 
+	int cpu;
 
 
 	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
+
+	cpu =  sched_getcpu();
 
 
 	cyc = get_cycles();
@@ -363,8 +384,8 @@ void * handler(void * arg)
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
 	*(args->cycle) = cyc;
-	printf("Fast thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput : %f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
+	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes\n \
+Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }
