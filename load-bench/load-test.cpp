@@ -157,7 +157,7 @@ int main(int argc, char ** argv)
 
 	printf(HLINE);
 	unsigned int bytes = param->globsiz * sizeof(double);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %d times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), nb_iter);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), nb_iter);
 	printf(HLINE);
 
 
@@ -558,13 +558,13 @@ void load_asm_sse(double const * t, intptr_t n, intptr_t k)
 			"1:;"
 			//vload from memory
 			"vmovapd (%2, %%rax, 8), %%xmm0;"
+			"vmovapd 16(%2, %%rax, 8), %%xmm4;"
 			"vmovapd 32(%2, %%rax, 8), %%xmm1;"
+			"vmovapd 48(%2, %%rax, 8), %%xmm5;"
 			"vmovapd 64(%2, %%rax, 8), %%xmm2;"
+			"vmovapd 80(%2, %%rax, 8), %%xmm6;"
 			"vmovapd 96(%2, %%rax, 8), %%xmm3;"
-			"vmovapd 128(%2, %%rax, 8), %%xmm4;"
-			"vmovapd 160(%2, %%rax, 8), %%xmm5;"
-			"vmovapd 192(%2, %%rax, 8), %%xmm6;"
-			"vmovapd 224(%2, %%rax, 8), %%xmm7;"
+			"vmovapd 112(%2, %%rax, 8), %%xmm7;"
 			//increment vload counter
 			//"addq $1, %%rcx;"
 			//increment and compare

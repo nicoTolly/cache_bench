@@ -2,13 +2,13 @@ CC=g++
 DEBUG=
 HWLOC=yes
 HUGEPAGES=
-AVX=yes
+AVX=
 
 ifeq ($(DEBUG),yes)
 	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic   
 	EXEC= load.db
 else
-	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -mavx -O3
+	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -O3
 	EXEC= load
 endif
 
