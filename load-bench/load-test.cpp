@@ -5,6 +5,7 @@
 #include <immintrin.h>
 #include "parser.h"
 #include "utils.h"
+#include <sched.h>
 
 #include <algorithm>
 
@@ -345,10 +346,13 @@ void * handler(void * arg)
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 	unsigned long cyc; 
+	int cpu;
 
 
 	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
+
+	cpu =  sched_getcpu();
 
 
 	cyc = get_cycles();
@@ -363,8 +367,8 @@ void * handler(void * arg)
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
 	*(args->cycle) = cyc;
-	printf("Fast thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput : %f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
+	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes\n \
+Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }
