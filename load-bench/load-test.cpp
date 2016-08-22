@@ -66,6 +66,7 @@ int main(int argc, char ** argv)
 	int quantum;
 	int BytesPerWord;
 	long nb_iter;
+	unsigned long load_bytes;
 
 
 	//Parsing args and initializing param
@@ -155,25 +156,28 @@ int main(int argc, char ** argv)
 
 	// getting number of iterations, we want to do approximately 2^25 cycles
 
-	long * iter;
+	long * iter = NULL;
+	load_bytes = 0;
 	if (param->thrSizes != NULL)
 	{
 		iter = get_tab_iter(param->thrSizes, param->nbThread);
 		nb_iter = 0;
 		for (int i = 0; i < param->nbThread; i++)
 		{
-			nb_iter += iter[i] * param->thrSizes[i];
+			//nb_iter += iter[i] ;
+			load_bytes += iter[i] * param->thrSizes[i] * sizeof(double); 
 		}
-	}
+		nb_iter = array_sum(iter, param->nbThread);
+}
 	else
 	{
 		nb_iter = get_nb_iter(param->globsiz);
+		load_bytes = nb_iter * param->globsiz;
 	}
 
 
 	printf(HLINE);
-	unsigned int bytes = param->globsiz * sizeof(double);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(bytes), units(bytes), nb_iter);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(load_bytes), units(load_bytes), nb_iter);
 	printf(HLINE);
 
 
@@ -304,7 +308,10 @@ int main(int argc, char ** argv)
 	hargs[0].t = tab ;
 	hargs[0].bar = &bar; 
 	//hargs[0].niter = nb_iter; 
-	hargs[0].niter = iter[0]; 
+	if (iter != NULL)
+		hargs[0].niter = iter[0]; 
+	else
+		hargs[0].niter = nb_iter; 
 	hargs[0].time = times ; 
 	hargs[0].cycle = cycles; 
 	if (param->thrSizes == NULL)
@@ -334,9 +341,9 @@ int main(int argc, char ** argv)
 	double maxtime = *(std::max_element(times, times + param->nbThread));
 	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
 
-	double ld = sizeof(double) * param->globsiz * nb_iter ;
-	printf("Global throughput : %f %cB/s\n", siz_d(ld / maxtime), units_d(ld / maxtime));
-	printf("Global bytes per cycle : %f %cB/c\n", siz_d(ld / maxcycle), units_d(ld / maxcycle));
+	//double ld = sizeof(double) * param->globsiz * nb_iter ;
+	printf("Global throughput : %f %cB/s\n", siz_d(load_bytes / maxtime), units_d(load_bytes / maxtime));
+	printf("Global bytes per cycle : %f %cB/c\n", siz_d(load_bytes / maxcycle), units_d(load_bytes / maxcycle));
 	printf("Estimated frequency : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
 
 	//free param

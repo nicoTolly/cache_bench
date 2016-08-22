@@ -1,0 +1,55 @@
+  1 #include <stdio.h>                                                                                           |145 // by printing the content of /proc/self/status
+  2 #include <stdlib.h>                                                                                          |146 void print_status()
+  3 #include <unistd.h>                                                                                          |147 {
+  4 #include <stdbool.h>                                                                                         |148         string line;
+  5 #include <immintrin.h>                                                                                       |149         ifstream file;
+  6 #include <stdint.h>                                                                                          |150         file.open("/proc/self/status");
+  7 #include <assert.h>                                                                                          |151         while(getline (file, line))
+  8 #include <time.h>                                                                                            |152         {
+  9 #include <iostream>                                                                                          |153                 if(regex_match(line, std::regex(".*HugetlbPages.*") ))
+ 10 #include <fstream>                                                                                           |154                         cout << line << endl;
+ 11 #include <regex>                                                                                             |155         }
+ 12                                                                                                              |156         file.close();
+ 13 #define M 20                                                                                                 |157 }
+ 14 # define HLINE "-------------------------------------------------------------\n"                             |158
+ 15                                                                                                              |159
+ 16 # ifndef MIN                                                                                                 |160 long get_nb_iter(long size)
+ 17 # define MIN(x,y) ((x)<(y)?(x):(y))                                                                          |161 {
+ 18 # endif                                                                                                      |162         long k = 64;
+ 19 # ifndef MAX                                                                                                 |163         if(size < 64)
+ 20 # define MAX(x,y) ((x)>(y)?(x):(y))                                                                          |164         {
+ 21 # endif                                                                                                      |165                 cout << "array too small !!" << endl;
+ 22                                                                                                              |166                 abort();
+ 23                                                                                                              |167         }
+ 24 # ifndef DOUBLE_PER_CYCLE                                                                                    |168         while(k * size * DOUBLE_PER_CYCLE < TOTAL_CYCLES )
+ 25 #define DOUBLE_PER_CYCLE 2                                                                                   |169                 k = k << 1;
+ 26 #endif                                                                                                       |170         return k;
+ 27                                                                                                              |171 }
+ 28 #ifndef TOTAL_CYCLES                                                                                         |172
+ 29 #define TOTAL_CYCLES ((long)1 << 32)                                                                         |173 long * get_tab_iter(int * sizes, int nsiz)
+ 30 #endif                                                                                                       |174 {
+ 31 char units(unsigned int n);                                                                                  |175         long * tab_iter = new long[nsiz];
+ 32 int siz(unsigned int n);                                                                                     |176         for (int i = 0 ; i < nsiz; i++)
+ 33 char units_d(double f);                                                                                      |177         {
+ 34 double siz_d(double n);                                                                                      |178                 tab_iter[i] = get_nb_iter(sizes[i]);
+ 35 inline unsigned long get_cycles();                                                                           |179         }
+ 36 int checktick();                                                                                             |180         return tab_iter;
+ 37 double mysecond();                                                                                           |181
+ 38 void print_status();                                                                                         |182 }
+ 39 long get_nb_iter(long size);                                                                                 |183
+ 40 long *  get_tab_iter(int * sizes, int nsiz);                                                                 |184 template <typename T> T array_sum(T * arr, int siz)
+ 41 template <typename T> T array_sum(T * arr, int siz);                                                         |185 {
+ 42 long array_sum(long * arr, int siz);                                                                         |186         T res = 0;
+~                                                                                                                |187         for (int i = 0; i < siz; i++)
+~                                                                                                                |188         {
+~                                                                                                                |189                 res += arr[i];
+~                                                                                                                |190         }
+~                                                                                                                |191         return res;
+~                                                                                                                |192 }
+~                                                                                                                |193
+~                                                                                                                |194 long array_sum(long * arr, int siz)
+~                                                                                                                |195 {
+~                                                                                                                |196         return array_sum<long>(arr, siz);
+~                                                                                                                |197 }
+utils.h                                                                                        41,19         Tout utils.cpp                                                                                     197,1          Bas
+"utils.cpp" 197L, 3505C écrit(s)

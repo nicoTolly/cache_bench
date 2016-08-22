@@ -181,7 +181,7 @@ long * get_tab_iter(int * sizes, int nsiz)
 	
 }
 
-template <typename T> T array_sum(T* arr, int siz)
+template <typename T> T array_sum(T * arr, int siz)
 {
 	T res = 0;
 	for (int i = 0; i < siz; i++)
@@ -189,4 +189,9 @@ template <typename T> T array_sum(T* arr, int siz)
 		res += arr[i];
 	}
 	return res;
+}
+
+long array_sum(long * arr, int siz) 
+{
+	return array_sum<long>(arr, siz);
 }
