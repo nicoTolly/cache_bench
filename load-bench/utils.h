@@ -37,3 +37,6 @@ int checktick();
 double mysecond();
 void print_status();
 long get_nb_iter(long size);
+long *  get_tab_iter(int * sizes, int nsiz);
+template <typename T> T array_sum(T * arr, int siz);
+long array_sum(long * arr, int siz);
