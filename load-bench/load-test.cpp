@@ -176,8 +176,9 @@ int main(int argc, char ** argv)
 	}
 
 
+	long bytes = param->globsiz * sizeof(double);
 	printf(HLINE);
-	printf("N = %ld, %d threads will be called, loading %d%c bytes of data %ld times\n", param->globsiz, param->nbThread, siz(load_bytes), units(load_bytes), nb_iter);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data \n", param->globsiz, param->nbThread, siz(bytes), units(bytes));
 	printf(HLINE);
 
 
@@ -391,8 +392,8 @@ void * handler(void * arg)
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
 	*(args->cycle) = cyc;
-	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes\n \
-Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
+	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes loaded %ld times\n \
+Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter, siz_d(ld / time), units_d(ld / time));
 
 	return NULL;
 }
@@ -403,10 +404,13 @@ void * handler_slw(void * arg)
 	double ld = sizeof(double) * args->size * args->niter;
 	double time;
 	unsigned long cyc; 
+	int cpu;
 
 
 	// barrier (waiting for everyone to be pinned)
 	pthread_barrier_wait(args->bar);
+
+	cpu =  sched_getcpu();
 
 
 	cyc = get_cycles();
@@ -422,6 +426,8 @@ void * handler_slw(void * arg)
 	*(args->cycle) = cyc;
 	printf("Slow thread has taken %11.8f s to execute, data : %ld bytes\n \
 Throughput :%f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
+	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes loaded %ld times\n \
+Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter, siz_d(ld / time), units_d(ld / time));
 	return NULL;
 }
 
