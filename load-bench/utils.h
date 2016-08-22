@@ -26,7 +26,7 @@
 #endif
 
 #ifndef TOTAL_CYCLES
-#define TOTAL_CYCLES ((long)1 << 32)
+#define TOTAL_CYCLES ((long)1 << 28)
 #endif
 char units(unsigned int n);
 int siz(unsigned int n);
