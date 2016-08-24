@@ -26,7 +26,7 @@
 #endif
 
 #ifndef TOTAL_CYCLES
-#define TOTAL_CYCLES ((long)1 << 32)
+#define TOTAL_CYCLES ((long)1 << 28)
 #endif
 char units(unsigned int n);
 int siz(unsigned int n);
@@ -37,3 +37,6 @@ int checktick();
 double mysecond();
 void print_status();
 long get_nb_iter(long size);
+long *  get_tab_iter(int * sizes, int nsiz);
+template <typename T> T array_sum(T * arr, int siz);
+long array_sum(long * arr, int siz);
