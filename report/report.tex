@@ -6,12 +6,25 @@
 \title{Your Title Here}
 \begin{document}
 \maketitle
-\tableofcontents
+tableofcontents
+
+
 
 
 \section{Introduction}
-Ce document rapporte mon activité durant le stage de six mois que j'ai 
-realisé a l'Inria.
+Ce document rapporte mon activité durant le stage de fin d'études que j'ai 
+realisé a l'Inria, l'Institut National de Recherche en Informatique et
+Automatique, au sein de l'équipe CORSE (Compilation and Optimisation in Runtime).
+J'ai donc eu affaires naturellement à des problématiques de recherche mais aussi à
+des problématiques d'ingénierie tout au long de ces six mois. Plus précisément, mes travaux ont été
+liées à des problématiques de programmation concurrente et multithreadés. Il s'est agi au départ d'évaluer
+le comportement et le partage des ressources sur des architectures dites NUMA, Non-Uniform Memory Access. 
+La problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
+entre différents threads.
+En l'état, mon travail a consisté en la réalisation d'un benchmark permettant d'évaluer les performances
+d'une architecture lorsque qu'un ou plusieurs threads sont limités et se disputent des ressources mémoire.
+On expliquera ici les difficultés qui ont été rencontrées et comment ces difficultés ont pu être dépassées.
+La problématique a ensuite été d'essayer de parvenir à proposer des algorithmes pertinents pour 
 
 \chapter{l'entreprise}
 
