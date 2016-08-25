@@ -37,4 +37,4 @@ monothread-bench/load.db
 monothread-bench/debug_obj/*
 monothread-bench/release_obj/*
 
-report/bin/*
+report/build/*
