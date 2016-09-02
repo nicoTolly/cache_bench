@@ -4,6 +4,7 @@ BIN=$(BIN_DIR)/report.pdf
 SRC=$(ROOT)/report.tex
 
 .PHONY: all
+.PHONY: mrproper
 
 all: $(BIN)
 
@@ -12,4 +13,5 @@ $(BIN): $(SRC)
 
 
 
-
+mrproper:
+	rm -f $(BIN_DIR)/*
