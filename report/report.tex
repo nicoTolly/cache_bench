@@ -1,0 +1,154 @@
+\documentclass{report}
+\usepackage{fullpage}
+\usepackage[utf8]{inputenc}
+\usepackage{setspace} 
+\usepackage[ampersand]{easylist}
+%\singlespacing 
+%\onehalfspacing 
+%\doublespacing 
+%\setstretch{1.1}
+\renewcommand{\baselinestretch}{2}
+\author{Nicolas Tollenaere}
+\title{Rapport de stage de fin d'études : Évaluation et prédiction du partage des ressources mémoires
+dans un programme multitâches}
+\begin{document}
+\maketitle
+\tableofcontents
+
+
+
+
+\chapter{Introduction}
+Ce document rapporte mon activité durant le stage de fin d'études que j'ai 
+realisé a l'Inria, l'Institut National de Recherche en Informatique et
+Automatique, au sein de l'équipe CORSE (Compilation and Optimisation in Runtime).
+J'ai donc eu affaires naturellement à des problématiques de recherche mais aussi à
+des problématiques d'ingénierie tout au long de ces six mois. Plus précisément, mes travaux ont été
+liées à des problématiques de programmation concurrente et multithreadés. Il s'est agi au départ d'évaluer
+le comportement et le partage des ressources sur des architectures dites NUMA, Non-Uniform Memory Access. 
+a problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
+entre différents threads.
+En l'état, mon travail a consisté en la réalisation d'un benchmark permettant d'évaluer les performances
+d'une architecture lorsque qu'un ou plusieurs threads sont limités et se disputent des ressources mémoire.
+On expliquera ici les difficultés qui ont été rencontrées et comment ces difficultés ont pu être dépassées.
+La problématique a ensuite été d'essayer de parvenir à proposer des algorithmes pertinents pour réaliser 
+des prédictions quant aux comportements des threads en concurrence. 
+Plusieurs pistes et modèles ont été explorés, certains résistant mieux que d'autres aux vérifications 
+expérimentales.
+Après avoir rappelé le contexte du stage, le statut de l'INRIA, les thèmes de travail de l'équipe CORSE où
+j'ai été intégré, nous allons voir en détail toutes les étapes qui ont été rencontrées au cours de ce stage. 
+Nous remettrons ensuite en perspective ces travaux et l'intérêt qu'ils peuvent représenter dans les 
+domaines traités par l'équipe.
+
+\chapter{Le contexte}
+\section{L'entreprise}
+
+Inria est l'Institut National de Recherche en Informatique et Automatique. Créé en 1967, il a le statut
+d'établissement à caractère scientifique et technologique. Sa mission est de coordonner la recherche dans 
+les domaines liés à l'informatique au niveau national. Il promeut, comme on peut le trouver sur le site officiel,
+l'excellence scientifique au service du transfert technologique et de la société.
+\\ Depuis sa création, Inria a développé de nombreux projets scientifques qui font jusqu'à aujourd'hui 
+sa réputation.  On peut citer, parmi les projets les plus connus , ses travaux sur les développements 
+d'internet, les langages de programmations Caml, Caml Light et Ocaml , le logiciel de calcul scientifique 
+Scilab, l'assistant de preuve Coq ou la bibliothèque de calcul flottant en haute précision GNU MPFR.
+\\ Inria emploie aujourd'hui 2700 collaborateurs, issus des structures françaises mais aussi des universités
+du monde entier. De par ses nombreux partenariats et son rayonnement dans la sphère scientifique de 
+l'informatique, il est un acteur majeur de la recherche au niveau mondial.
+Inria est également reconnu pour son implication active dans la promotion du logiciel libre. Ainsi, les
+prohets Ocaml, Coq, Scilab ou GNU MPFR sont tous déposés sous licence libre, soit directement sous la 
+licence GNU GPL, soit sous la licence compatible créée par Inria en collaboration avec le CEA et le CNRS
+ CeCILL (CEA CNRS Inria Logiciel Libre). La bibliothèque MPFR (Multiple Precision Floating Point Reliably)
+ est d'ailleurs utilisée dans le célèbre compilateur GNU GCC (GNU Compiler Collection).
+\\ Les effectifs de l'Inria sont organisées en de nombreuses équipes constituées en moyenne d'une vingtaine
+ de personnes (membres permanents ou non-permanents), accueillant à l'occasion (ou même de manière continue)
+des chercheurs dépendants d'autres institutions. Les équipes sont à leur tour réparties sur huit centres 
+autonomes dispersés sur tout le territoire métropolitain. C'est dans l'une de ces équipes que j'ai réalisé
+mon stage de fin d'études.
+
+\section{L'équipe}
+
+Au sein de l'équipe Inria Rhones-Alpes, sur un site détaché dans les locaux de Minatech 
+et du CEA de Grenoble, je suis intégré au sein de l'équipe CORSE (Compiler Optimization 
+and Runtime SystEm). Créée il y a cinq ans, cette équipe est dirigée par Fabrice RASTELLO.
+Comme son nom l'indique, elle s'occupe de problèmes liés à l'interaction entre la compilation
+et l'exécution d'un programme, ainsi que d'autres problématiques connexes comme le déboguage.
+Elle rassemble aussi bien des personnes spécialistes de la compilation que des spécialistes 
+du runtime (donc de l'exécution).
+\\ La conception et les perspectives des architectures matérielles ont beaucoup évolué dans les 
+quinze dernières années.  Des tout débuts de l'informatique jusqu'au début des années 2000 
+environ, les différents processeurs et composants ont eu tendance à converger et à se faire de
+plus en plus puissantes (on parle ici de fréquence des processeurs et de nombres d'instructions 
+par seconde). On imaginait généralement que cette évolution se poursuivrait et que conséquemment, 
+un même programme pourrait être exécuté plus rapidement dès lors qu'on le ferait tourner sur une 
+nouvelle architecture. Les années 2000 ont mis fin à cette croyance lorsque des problématiques 
+telles que la consommation d'électricité ainsi que le dégagement d'énergie et de chaleur qui 
+s'ensuivait et qui posait de gros problèmes quant au refroidissement du matériel sont apparus. Il 
+était devenu impossible d'augmenter la puissance de calcul brute des processeurs sans détériorer 
+très considérablement leur consommation d'énergie, mais aussi probablement leur durée de vie au vu du 
+problème de refroidissement. Sur un tout autre plan, s'est posée la question de ce que l'on a 
+appelé le Memory Gap.  Au début de l'informatique, les architectures avaient généralement une capacité
+de calcul inférieure à leur capacité à rapatrier des données depuis la mémoire. Ainsi, la puissance de
+calcul d'un programme se trouvait très souvent limitante par rapport à sa capacité de chargement. 
+L'évolution de la technologie s'est faite de telle manière que le rapport se trouve aujourd'hui 
+être inversé, c'est-à-dire que réaliser une opération simple sur une ou plusieurs données (une addition
+ou une multiplication par exemple) est beaucoup plus rapide que de rapatrier cette ou ces données depuis
+la mémoire principale. Dès lors, augmenter encore cette puissance de calcul peut se trouver tout à 
+fait inutile dans de nombreux cas dans la mesure où bien des programmes passeront plus de temps à 
+attendre l'arrivée des données qu'à réellement effectuer des calculs dessus. 
+\\ Ces considérations ont rendu déraisonnable l'idée de continuer à augmenter indéfiniment la fréquence des 
+processeurs. Il s'ensuivit que les architectures recommencèrent à se diversifier pour pouvoir continuer à 
+offrir des performances accrues. On observe ainsi une recrudescence de machines très spécialisées, par 
+exemple dans le traitement d'image (les cartes graphiques) ou dans la cryptographie. Par ailleurs, les 
+architectures dites parallèles ainsi que distribuées connurent et connaissent toujours un développement 
+significatif.
+\\ Dans ce contexte, les problématiques de compilation et d'exécution deviennent cruciales, car un même 
+programme sémantique doit être adapté de manière efficace à des cibles très diverses. Il est parfois 
+très difficile, par exemple, d'exécuter de manière efficace sur une machine parallèle un programme
+prévu à l'origine pour une exécution séquentielle (il est même souvent nécessaire de repenser 
+entièrement le programme). Dans l'idéal, il faudrait que le programmeur n'ait en aucun cas à gérer des 
+questions spécifiques à chaque architecture, à la fois dans un souci de simplicité et de portabilité.
+Il serait donc souhaitable que cette charge soit entièrement dévolue au compilateur, qui lui est 
+capable de cibler spécifiquement un environnement d'exécution. En pratique, tout ceci est généralement 
+assez compliqué. Le travail de l'équipe se situe ici. Les membres cherchent à fournir des outils
+permettant de tirer le meilleur parti d'architectures très différentes à partir d'un même code source, 
+selon des métriques qui peuvent également varier avec la situation. Il s'agit généralement d'améliorer 
+la performance en temps, en espace mémoire et/ou en énergie.
+\\ Pour cela, l'équipe développe, pour une part, des stratégies dynamiques où les décisions sont prises au
+moment de l'exécution réelle du programme sur une machine. Ces décisions peuvent concerner l'équilibrage
+des charges, la répartition des tâches sur différents processeurs, etc.
+\\Pour une autre part, l'équipe développe aussi des stratégies statiques, dans lesquelles les décisions
+sont prises au moment de la compilation du programme. De nombreuses optimisations peuvent être réalisées
+à ce moment-là grâce à une analyse du code (par exemple l'élimination de code mort, l'inlining de fonction
+ou l'élimination des variables intermédiaires).
+\\Mais surtout, l'équipe cherche autant que possible à développer des tactiques améliorant l'interface
+entre les deux. D'un côté, le sytème runtime (dynamique) dispose d'informations précieuses sur 
+l'environnement dans lequel le programme est exécuté. Par contre, il n'a qu'une vision partielle et 
+immédiate de ce programme, puisqu'il ne peut en réaliser une analyse globale. D'un autre côté, le 
+compilateur, s'il n'a pas d'informations sur le contexte précis d'exécution, réalise néanmoins une
+analyse globale du code. On peut donc imaginer que le compilateur pourrait passer des informations 
+utiles pour guider le runtime dans sa prise de décision.
+\\Les domaines d'applications spécifiques de ces travaux sont nombreux mais ont trait essentiellement
+au calcul scientifique. Des programmes liés à la physique des matériaux ou à la propagation d'ondes
+ont directement tiré profit des travaux de l'équipe. Il arrive également que des partenariats se
+fassent avec des fabricants de processeurs ou d'autres composants afin de réaliser un travail spécifique
+d'optimisation sur leurs machines.
+\chapter{Première partie du stage : Openmp et Numa}
+
+Ma mission était initialement liée à la technologie openmp. Openmp est une interface de programmation
+disponible pour les langages C, C++ et Fortran qui permet de faciliter grandement l'écriture de programmes
+parallèles. Comme nous allons le voir, elle fait intervenir à la fois des techniques de compilation et des
+techniques dynamique, ce qui la place au coeur des thèmes de l'équipe. L'idée était d'étudier le 
+d'applications utilisant openmp sur des architectures particulières. Les machines ciblées étaient de type
+Non Uniform Memory Architecture. Cela signifie que, si chaque processeur a accès à toute la mémoire de la
+machine, il a néanmoins un accès privilégié à une certaine portion de cette mémoire (on parle de noeud) et
+met donc plus de temps à accéder à une donnée stockée dans un autre noeud. Il peut donc y avoir des cas où
+des threads se trouvent obligés d'accéder à une mémoire distante, ce qui aurait peut-être pu être évité. 
+Nous allons donc maintenant :
+\begin{easylist}[checklist]
+   & expliquer plus précisément le fonctionnement d'openmp 
+   & détailler la raison d'être et les enjeux des architectures NUMA
+   & montrer l'avancée dans le stage, les solutions déjà existantes et la démarche
+   & montrer ce qui nous a poussé à faire évoluer le sujet de travail 
+  \end{easylist}
+  \section{openmp : fonctionnement}
+\end{document}
