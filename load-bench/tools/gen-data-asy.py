@@ -13,7 +13,7 @@ fname = 'thread-sizes.txt'
 rname = "results"
 binpath = "../load"
 
-nbBigThr = 4
+nbBigThr = 1
 
 rname += str(nbBigThr + 1)
 rname += ".txt"
@@ -41,7 +41,9 @@ def gendata(size, f):
 f = open(fname, 'w+')
 
 #base array size, in number of double
-base = 200000
+base = 50000
+#stride
+step = 20000
 
 bigThr = 20000000
 f.write('{0}\n'.format(base))
@@ -49,13 +51,13 @@ for i in range(nbBigThr):
     f.write('{0}\n'.format(bigThr))
 f.write('')
 
-for i in range(30):
+for i in range(40):
     f.seek(0)
     size = int(f.readline()) 
     gendata( 8 * size, f)
     f.seek(0)
     f.truncate()
-    size_next_iter = size + 80000
+    size_next_iter = size + step
     f.write('{0}\n'.format(size_next_iter))
     for i in range(nbBigThr):
         f.write('{0}\n'.format(bigThr))
