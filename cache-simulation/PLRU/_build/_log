@@ -1,0 +1,18 @@
+### Starting build.
+# Target: main.ml.depends, tags: { extension:ml, file:main.ml, ocaml, ocamldep, quiet }
+/usr/bin/ocamldep -modules main.ml > main.ml.depends
+# Target: PLRU.mli.depends, tags: { extension:mli, file:PLRU.mli, ocaml, ocamldep, quiet }
+/usr/bin/ocamldep -modules PLRU.mli > PLRU.mli.depends
+# Target: PLRU.cmi, tags: { byte, compile, extension:mli, file:PLRU.mli, interf, ocaml, quiet }
+/usr/bin/ocamlc -c -o PLRU.cmi PLRU.mli
+# Target: main.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:main.cmo, file:main.ml, implem, ocaml, quiet }
+/usr/bin/ocamlc -c -o main.cmo main.ml
+# Target: PLRU.ml.depends, tags: { extension:ml, file:PLRU.ml, ocaml, ocamldep, quiet }
+/usr/bin/ocamldep -modules PLRU.ml > PLRU.ml.depends
+# Target: PLRU.cmx, tags: { compile, extension:cmx, extension:ml, file:PLRU.cmx, file:PLRU.ml, implem, native, ocaml, quiet }
+/usr/bin/ocamlopt -c -o PLRU.cmx PLRU.ml
+# Target: main.cmx, tags: { compile, extension:cmx, extension:ml, file:main.cmx, file:main.ml, implem, native, ocaml, quiet }
+/usr/bin/ocamlopt -c -o main.cmx main.ml
+# Target: main.native, tags: { dont_link_with, extension:native, file:main.native, link, native, ocaml, program, quiet }
+/usr/bin/ocamlopt PLRU.cmx main.cmx -o main.native
+# Compilation successful.
