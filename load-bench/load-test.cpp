@@ -30,6 +30,7 @@ void __attribute__((optimize("O0"))) load_asm2(double const * t, intptr_t n, int
 void __attribute__((optimize("O0"))) load_asm_slw(double const * t, intptr_t n, intptr_t k) ;
 #endif
 
+#undef USE_PADDING
 void __attribute__((optimize("O0"))) load_asm_sse(double const * t, intptr_t n, intptr_t k) ;
 
 
@@ -67,6 +68,11 @@ int main(int argc, char ** argv)
 	int BytesPerWord;
 	long nb_iter;
 	unsigned long load_bytes;
+#ifdef USE_PADDING
+// We introduce some padding in data to see if 
+// something is changed
+	int var_padding = (1 << 25);
+#endif
 
 
 	//Parsing args and initializing param
@@ -131,8 +137,13 @@ int main(int argc, char ** argv)
 	tab = (double *) ptrvoid;
 
 #else
-	tab = new double[param->globsiz + 8];
-#endif
+#ifdef USE_PADDING
+	//padding
+	tab = new double[param->globsiz + 8 + param->nbThread * var_padding];
+#else//USE_PADDING
+	tab = new double[param->globsiz + 8 ];
+#endif//USE_PADDING
+#endif //HUGE
 	if(tab == NULL)
 	{
 		cout << "could not allocate tab" << endl;
@@ -215,7 +226,11 @@ int main(int argc, char ** argv)
 		for(i = 1; i < nbFst; i++)
 		{
 			//address of data start for this thread
-			hargs[i].t = tab + offset;
+#ifdef USE_PADDING
+			hargs[i].t = tab + offset + var_padding;
+#else//USE_PADDING
+			hargs[i].t = tab + offset ;
+#endif//USE_PADDING
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->fsiz; 
 			hargs[i].niter = nb_iter; 
@@ -245,7 +260,8 @@ int main(int argc, char ** argv)
 		intptr_t offset = param->thrSizes[0];
 		for(int i = 1; i < param->nbThread; i++)
 		{
-			hargs[i].t = tab + offset;
+			//padding with adding_var doubles
+			hargs[i].t = tab + offset ;
 			hargs[i].bar = &bar; 
 			hargs[i].size = param->thrSizes[i]; 
 			//hargs[i].niter = nb_iter; 
