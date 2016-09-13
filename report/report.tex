@@ -49,7 +49,7 @@ J'ai donc eu affaires naturellement à des problématiques de recherche mais aus
 des problématiques d'ingénierie tout au long de ces six mois. Plus précisément, mes travaux ont été
 liées à des problématiques de programmation concurrente et multithreadés. Il s'est agi au départ d'évaluer
 le comportement et le partage des ressources sur des architectures dites NUMA, Non-Uniform Memory Access. 
-a problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
+La problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
 entre différents threads.
 En l'état, mon travail a consisté en la réalisation d'un benchmark permettant d'évaluer les performances
 d'une architecture lorsque qu'un ou plusieurs threads sont limités et se disputent des ressources mémoire.
@@ -144,7 +144,7 @@ sont prises au moment de la compilation du programme. De nombreuses optimisation
 à ce moment-là grâce à une analyse du code (par exemple l'élimination de code mort, l'inlining de fonction
 ou l'élimination des variables intermédiaires).
 \\Mais surtout, l'équipe cherche autant que possible à développer des tactiques améliorant l'interface
-entre les deux. D'un côté, le sytème runtime (dynamique) dispose d'informations précieuses sur 
+entre les deux. D'un côté, le système runtime (dynamique) dispose d'informations précieuses sur 
 l'environnement dans lequel le programme est exécuté. Par contre, il n'a qu'une vision partielle et 
 immédiate de ce programme, puisqu'il ne peut en réaliser une analyse globale. D'un autre côté, le 
 compilateur, s'il n'a pas d'informations sur le contexte précis d'exécution, réalise néanmoins une
@@ -206,6 +206,7 @@ au nombre de coeurs de la machine sur laquelle le programme est exécuté. Ainsi
 ci-dessous, Hello World sera affiché quatre fois si la machine possède quatre coeurs.
 \begin{lstlisting}
 #include <stdio.h>
+#include <omp.h>
 
 int main(void)
 {
@@ -217,6 +218,177 @@ int main(void)
 
 \end{lstlisting}
 
+Il faut simplement ajouter une option de compilation (fopenmp pour gcc et clang) pour compiler
+correctement le programme.
 De nombreuses autres possibilités sont offertes dans la mesure où les programmes concurrents ont
-généralement besoin de synchronisation.
+généralement besoin de synchronisation. Ainsi OpenMP fournit-il notamment des barrières (\#pragma
+omp barrier) qui permettent d'imposer aux threads un point de synchronisation. Chaque thread se voit 
+attribué un identifiant, ce qui permet de différencier les tâches selon les threads. Il est aussi
+possible de faire en sorte qu'une portion du programme ne soit accomplie que par le ``master''
+(\#pragma omp master - le master est simplement le thread qui possède l'id 0), d'exiger que cette
+portion ne soit accédée que par un thread à la fois, voire par un seul thread, peu importe lequel.
+Ainsi, considérons l'exemple suivant : 
+\begin{lstlisting}
+#include <stdio.h>
+#include <omp.h>
+
+int main(void)
+{
+#pragma omp parallel
+  {
+    int tid = omp_get_thread_num();
+    printf("Hello, world from thread \%d\n", tid);
+#pragma omp master
+    printf("I'm the master ! \n" );
+  }
+}
+\end{lstlisting}
+Une sortie typique de ce programme serait, par exemple :
+\\Hello, world from thread 2
+\\Hello, world from thread 0
+\\Hello, world from thread 1
+\\Hello, world from thread 3
+\\ I'm the master ! 
+
+Mais il est aussi possible d'avoir :
+\\Hello, world from thread 2
+\\Hello, world from thread 0
+\\ I'm the master ! 
+\\Hello, world from thread 1
+\\Hello, world from thread 3
+
+ L'instruction barrier nous permet d'éviter cela.
+\begin{lstlisting}
+#include <stdio.h>
+#include <omp.h>
+
+int main(void)
+{
+#pragma omp parallel
+  {
+    int tid = omp_get_thread_num();
+    printf("Hello, world from thread \%d\n", tid);
+#pragma omp barrier
+#pragma omp master
+    printf("I'm the master ! \n" );
+  }
+}
+
+
+\end{lstlisting}
+
+De la sorte, on a contraint le programme à afficher I'm the master seulement une fois que chacun 
+des threads aura affiché son Hello.
+
+La politique de partage de ressources entre les threads est également un élément clé de la programmation
+concurrente. Conséquemment, OpenMP offre la possibilité de déclarer une variable ``shared'' ou ``private''.
+Dans le premier cas, elle sera visible et modifiable par tous les threads, et son accès nécessitera sans
+doute une synchronisation. Dans le second cas, chaque thread aura une copie de la variable invisible aux 
+autres. Il existe des variations que nous n'allons pas discuter.
+\\Il n'est pas utile de rentrer ici plus longuement dans les détails. Ajoutons simplement que la
+norme a bien entendu énormément évolué au cours du temps pour répondre à des besoins de plus en plus
+variés. Ainsi, il est désormais possible de réaliser des parallélisations vectorielles. Des possibilités
+ont également été ajoutées pour pouvoir changer à loisir le nombre de threads engagés ainsi que le coeur 
+sur lequel ils s'exécuteront. Voyons maintenant comment se déroule concrètement la compilation et
+l'exécution d'un programme OpenMP.
+
+\subsection{Fonctionnement}
+
+La spécification OpenMP jouit de nombreuses implémentations. Deux sont particulièrement notables : celle
+qui est fournie avec GCC (Gnu Compiler Collection) et celle développée Intel, utilisée en particulier
+par Clang. Cependant, il en existe d'autres, dont certaines sont même développées à l'Inria, comme Kaapi
+ou StarPU.
+\\Il convient maintenant de mieux préciser le fonctionnement d'une implémentation OpenMP. Celui-ci est
+divisé en deux parties : une part du travail est réalisée à la compilation. En se basant sur les pragmas
+écrites par le programmeur, le compilateur va isoler dans le code les portions destinées à être exécutées
+en parallèle, et effectuer quelques autres transformations. 
+\\ La deuxième partie du travail sera effectuée directement à l'exécution par un système runtime. À ce 
+moment seront déterminés des paramètres tels que le nombre de threads. Il faut bien comprendre que si les
+deux parties sont bien distinctes, elles sont néanmoins fortement interdépendantes : en règle générale,
+un programme compilé avec un compilateur donné ne pourra fonctionner qu'avec le runtime correspondant,
+même si cette limitation est contournable. Cela explique pourquoi les deux implémentations majeures ont
+été développés par des entités fortement impliquées dans le domaine de la  compilation, à 
+savoir GCC et Intel. 
+\\Voyons un peu plus en détails chacun des deux points, en commençant par la compilation. Comme dit plus
+haut, l'idée ici est d'isoler le code à paralléliser du reste et d'introduire au bon endroit des appels
+aux fonctionnalités appropriées du runtime. Pour cela, le compilateur réalise une opération
+d'``outilining''. Comme le nom l'indique, il s'agit de l'exact inverse de l'inlining. Là où l'inlining
+prend le code d'une fonction pour l'injecter à l'endroit où la fonction en question est appelée, 
+l'outilining sélectionne une portion du code et la remplace par un appel à une fonction comprenant le
+code correspondant. On supprime une indirection dans le premier cas là où on en rajoute une dans le 
+second. Ainsi, le code suivant :
+\begin{lstlisting}
+#include <stdio.h>
+#include <omp.h>
+
+int main(void)
+{
+    #pragma omp parallel
+    printf("Hello, world.\n");
+    return 0;
+}
+
+
+\end{lstlisting}
+
+pourra être remplacé par celui-ci :
+\begin{lstlisting}
+#include <stdio.h>
+#include <omp.h>
+
+void omp_fun()
+{
+    printf("Hello, world.\n");
+}
+
+int main(void)
+{
+    omp_fun();
+    return 0;
+}
+
+
+
+\end{lstlisting}
+Le nom de la fonction choisi ici est un exemple : il dépend du compilateur utilisé. Cette opération est
+de toute façon transparente pour l'utilisateur. 
+\\L'outlining seul ne suffit pas : l'objectif concret est d'indiquer au runtime sur quelle partie du code
+il est censé travailler. Pour cela, la fonction qui a été outlinée va en fait être passée en paramètre
+(sous forme d'un pointeur) à une fonction de la bibliothèque du runtime. Pour le runtime d'Intel, la 
+fonction d'entrée s'appelle kmpc\_fork\_call. On aura donc, schématiquement : 
+
+\begin{lstlisting}
+#include <stdio.h>
+#include <omp.h>
+
+void omp_outlined_fun()
+{
+    printf("Hello, world.\n");
+}
+
+int main(void)
+{
+    kmpc_fork_call((void (void)*)omp_outlined_fun);
+    return 0;
+}
+
+\end{lstlisting}
+
+D'autres arguments sont également passés à la fonction. Pour ce qui est des variables, un pointeur est
+passé en argument de la fonction outlinée si elle est partagée, ou la variable est placée directement
+dans la pile (elle est donc déclarée au début du corps de la fonction) quand elle est privée.
+\\Tout marche grossièrement de cette manière : les différentes directives passées au travers des pragmas
+sont associés à des fonctions du runtime auxquelles des appels sont faits dans le programme produit par
+le compilateur. 
+\\Quant au runtime, il s'agit en fait simplement d'une bibliothèque dynamique. Cette bibliothèque 
+contient toutes les fonctions évoquées au-dessus. Comme la bibliothèque est dynamique, le linkage est fait
+au moment de l'exécution plutôt qu'au moment de la compilation, ce qui autorise un programme à utiliser
+des versions plus récentes que celles qui existaient lorsqu'il a été compilé (pour peu qu'on ait assuré
+la rétrocompatibilité de la bibliothèque). Il faut cependant que le compilateur connaissent la signature
+(nom et type des arguments) des fonctions utilisées. C'est la raison de la dépendance runtime/compilateur
+déjà évoquée. Comme on l'a dit, cette limitation peut néanmoins être contournée. Ainsi, le support 
+d'exécution d'Intel peut exécuter des programmes compilés avec gcc. Pour cela, il inclue dans son code
+des redirections des fonctions du runtime de gcc vers les fonctions de son propre runtime. Néanmoins,
+ceci n'est pas généralisable.
+
 \end{document}
