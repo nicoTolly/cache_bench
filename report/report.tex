@@ -4,6 +4,8 @@
 \usepackage{setspace} 
 \usepackage[ampersand]{easylist}
 
+\usepackage{graphicx}
+\graphicspath{{images/}}
 
 \usepackage{color}
 \usepackage{listings}
@@ -78,7 +80,7 @@ Scilab, l'assistant de preuve Coq ou la bibliothèque de calcul flottant en haut
 du monde entier. De par ses nombreux partenariats et son rayonnement dans la sphère scientifique de 
 l'informatique, il est un acteur majeur de la recherche au niveau mondial.
 Inria est également reconnu pour son implication active dans la promotion du logiciel libre. Ainsi, les
-prohets Ocaml, Coq, Scilab ou GNU MPFR sont tous déposés sous licence libre, soit directement sous la 
+projets Ocaml, Coq, Scilab ou GNU MPFR sont tous déposés sous licence libre, soit directement sous la 
 licence GNU GPL, soit sous la licence compatible créée par Inria en collaboration avec le CEA et le CNRS
  CeCILL (CEA CNRS Inria Logiciel Libre). La bibliothèque MPFR (Multiple Precision Floating Point Reliably)
  est d'ailleurs utilisée dans le célèbre compilateur GNU GCC (GNU Compiler Collection).
@@ -155,6 +157,12 @@ au calcul scientifique. Des programmes liés à la physique des matériaux ou à
 ont directement tiré profit des travaux de l'équipe. Il arrive également que des partenariats se
 fassent avec des fabricants de processeurs ou d'autres composants afin de réaliser un travail spécifique
 d'optimisation sur leurs machines.
+\section{Mon stage}
+Au sein de l'équipe Corse, je suis co-encadré par Florent Bouchez-Tichadou, maître de conférence, ainsi
+que par Fabrice Rastello, directeur de recherche et chef de l'équipe. L'idée de départ du stage est de 
+s'intéresser à des problématiques liées à la bande-passante mémoire. Au vu des directions de recherche
+de l'équipe, le choix de s'intéresser à la technologie OpenMP était relativement naturel. C'est donc
+ ce que j'ai fait dans la première partie de mon stage.
 \chapter{Première partie du stage : OpenMP et Numa}
 
 Ma mission était initialement liée à la technologie OpenMP. OpenMP est une interface de programmation
@@ -336,14 +344,14 @@ pourra être remplacé par celui-ci :
 #include <stdio.h>
 #include <omp.h>
 
-void omp_fun()
+void omp_outlined_fun()
 {
     printf("Hello, world.\n");
 }
 
 int main(void)
 {
-    omp_fun();
+  omp_outlined_fun();
     return 0;
 }
 
@@ -390,5 +398,56 @@ déjà évoquée. Comme on l'a dit, cette limitation peut néanmoins être conto
 d'exécution d'Intel peut exécuter des programmes compilés avec gcc. Pour cela, il inclue dans son code
 des redirections des fonctions du runtime de gcc vers les fonctions de son propre runtime. Néanmoins,
 ceci n'est pas généralisable.
+\\C'est à peu près tout ce que l'on peut dire du fonctionnement d'OpenMP sans rentrer dans des détails
+propres à une implémentation particulière. Quand bien même la contrainte de la spécification induit des
+similitudes dans les codes, on trouvera presque partout des spécificités plus ou moins marquées. Il peut
+d'ailleurs arriver que deux implémentations produisent des performances différentes en fonction des
+situations. Nous verrons tout cela un peu plus loin, lorsque l'on étudiera plus particulièrement
+le fonctionnement de Clang dans la situation qui nous intéresse.
+
+\section{Les architectures NUMA}
+NUMA signifie, comme nous l'avons déjà précisé auparavant, Non-Uniform Memory Architecture. Ces 
+architectures possèdent généralement de nombreux coeurs. Leur spécificité est que si ces coeurs 
+peuvent accéder à l'intégralité de la mémoire de la machine, ils ne disposent pas d'un accès uniforme : 
+ils sont rassemblés en groupes (par exemple de huit coeurs) qui ont chacun un accès privilégié à une 
+portion de la mémoire. L'ensemble groupe de coeurs/portion de la mémoire privilégiée est appelé un 
+noeud. Ainsi, un coeur accèdera plus rapidement à une donnée située dans son noeud qu'à une donnée 
+située ailleurs. La figure \ref{fig:NUMA1} montre ce fonctionnement. L'accès à un noeud distant 
+est plus long car il nécessite une requête du réseau interconnectant les noeuds.
+
+\begin{figure}
+  \includegraphics[width=\linewidth]{NUMA.jpg}
+  \caption{schéma simplifié d'une architecture NUMA}
+  \label{fig:NUMA1}
+\end{figure}
+
+Les architectures NUMA ont commencé à être étudiées, produites et vendues comme des réponses au problème
+du memory gap évoqué plus haut. Pour rappel, le memory gap désigne l'écart croissant entre les performances
+de calcul et les performances de bande-passante mémoire des architectures, les dernières étant désormais 
+largement dépassées par les premières. Dans le cas d'une architecture disposant de très nombreux coeurs,
+l'accès à la mémoire peut très vite devenir problématique dans la mesure où chacun des coeurs partagent
+les mêmes ressources pour récupérer leurs données. Ainsi, si beaucoup de coeurs essaient d'accéder en
+même temps à la mémoire, le temps d'accès par coeur se trouvera très dégradé, au point que l'augmentation
+du nombre de coeurs deviendra contre-productive. 
+\\Ce problème peut être mitigé avec les architectures NUMA. En séparant la mémoire en différents noeuds,
+on essaie de diminuer les cas où plusieurs coeurs entreront en concurrence pour la même ressource. Dans
+le cas idéal où chaque coeur n'accède qu'à des données situées sur son noeud, on garantit que jamais
+plus de huit coeurs (si le noeud en contient huit) ne se partageront le réseau. Bien entendu, si les
+coeurs commencent à beaucoup accéder à des données situées sur des noeuds distants, le problème se posera
+à nouveau. Les politiques d'allocation mémoire sont conçues pour éviter au maximum ce genre de configuration.
+Le système est plus flexible qu'un simple cluster dans la mesure où la communication de données entre noeuds
+est transparente d'un point de vue logique - la différence ne se fait que sur le temps de transfert, là
+où un système par messages, type MPI,  serait nécessaire pour un cluster. NUMA est donc un compromis 
+considéré comme acceptable entre un système multicoeurs à mémoire partagée uniforme et un cluster.
+
+\section{Avancées pendant le stage}
+L'idée de base est d'observer l'interaction entre OpenMP et les architectures NUMA. Plus explicitement,
+on veut savoir comment se déroule l'exécution d'un programme OpenMP sur une machine NUMA, et si 
+éventuellement des comportements non-optimaux peuvent se produire, à savoir est-il possible qu'un thread
+se trouve accéder à un noeud NUMA distant. Si la réponse est affirmative - et si le cas se produit 
+suffisamment souvent pour être considéré comme pathologique - peut-on améliorer la situation ?
+\\OpenMP ne gère jamais l'allocation des données en mémoire. De fait, les programmes reposent sur 
+l'implémentation présente en local de fonctions comme malloc ou calloc, ou même à plus bas niveau
+d'appels systèmes comme mmap.
 
 \end{document}
