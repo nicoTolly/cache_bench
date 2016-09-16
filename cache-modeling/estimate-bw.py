@@ -3,6 +3,9 @@ import numpy
 import re
 
 input_name = "data-dracula.txt"
+input_name2 = "results2.txt"
+input_name3 = "results3.txt"
+input_name4 = "results4.txt"
 def femp_interpol(datak, datav):
     coeff = numpy.polyfit(datak, datav, len(datak) - 1)
     diccoeff = [(i, coeff[len(datak) - i - 1]) for i in range(len(coeff))]
@@ -60,8 +63,6 @@ def derivate(f, delta):
     return  func
 
 def calculate_cache(lThreads, lBw):
-    nbThr = len(lThreads)
-    if (nbThr == 1)
     f = fromdata(data)
     #f = femp_interpol(datakeys, dataval)
     if ( not lThreads):
@@ -84,7 +85,7 @@ def calculate_cache(lThreads, lBw):
 
 
 
-dataf = open(input_name, "r")
+dataf = open(input_name2, "r")
 line = dataf.readline()
 datakeys = []
 dataval = []
