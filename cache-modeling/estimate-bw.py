@@ -1,8 +1,10 @@
 import scipy.optimize
 import numpy
 import re
+import sys
 
-input_name = "data-dracula.txt"
+#input_name = "data-dracula.txt"
+input_name = "results1.txt"
 input_name2 = "results2.txt"
 input_name3 = "results3.txt"
 input_name4 = "results4.txt"
@@ -35,18 +37,17 @@ def femp(x, data):
 def get_threads():
     tab=[]
     print("Enter data size for each threads, press <Return> when finished")
-    while(True):
-        s = input()
-        if (re.match( '\d+', s)):
+    s = sys.stdin.readline()
+    while(s and (not re.match('^$', s))):
+        s = s.strip()
+        try:
             tab.append(int(s))
-        elif (re.match('^$', s)):
-            if (len(tab) == 0):
-                print("You must at least declare one thread")
-            else:
-                return tab
-        else:
+        except ValueError:
             print("Enter number")
-
+        s = sys.stdin.readline()
+            
+    print(tab)
+    return tab
 
 
 
@@ -62,6 +63,8 @@ def derivate(f, delta):
          return ((f(x0 + delta) - f(x0)) / float(delta))
     return  func
 
+#take a reverse sorted thread sizes list and 
+#returns the list of corresponding bandwidths
 def calculate_cache(lThreads, lBw):
     f = fromdata(data)
     #f = femp_interpol(datakeys, dataval)
@@ -73,19 +76,29 @@ def calculate_cache(lThreads, lBw):
         lThreads.pop(0)
         return calculate_cache(lThreads, lBw)
     else:
-        thrsum = sum(lThreads)
-        lBwsum = sum(lBw)
-        def func(x):
-            return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
-        xopt = scipy.optimize.newton_krylov(func, thrsum, f_tol = 1.0)
-        lBw.append(f(xopt))
-        lThreads.pop(0)
-        return calculate_cache(lThreads, lBw)
+        try:
+            thrsum = sum(lThreads)
+            lBwsum = sum(lBw)
+            def func(x):
+                return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
+            xopt = scipy.optimize.newton_krylov(func, thrsum, f_tol = 1.0)
+            lBw.append(f(xopt))
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw)
+        except ValueError:
+            # approximation can fail when bw is too big
+            # this is not a problem as we know for sure
+            # that bandwidth takes the minimum value 
+            # in this case
+            bw = lBw[-1]
+            lBw.append(bw)
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw)
 
 
 
 
-dataf = open(input_name2, "r")
+dataf = open(input_name3, "r")
 line = dataf.readline()
 datakeys = []
 dataval = []
