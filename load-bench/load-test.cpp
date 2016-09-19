@@ -349,6 +349,7 @@ int main(int argc, char ** argv)
 	{
 		hargs[0].size = param->thrSizes[0];
 		handler((void *)&hargs[0]);
+
 	}
 
 

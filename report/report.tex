@@ -3,6 +3,29 @@
 \usepackage[utf8]{inputenc}
 \usepackage{setspace} 
 \usepackage[ampersand]{easylist}
+
+
+\usepackage{color}
+\usepackage{listings}
+\lstset{ %
+language=C++,                % choose the language of the code
+basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+numbers=left,                   % where to put the line-numbers
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+stepnumber=1,                   % the step between two line-numbers. If it is 1 each line will be numbered
+numbersep=5pt,                  % how far the line-numbers are from the code
+backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
+showspaces=false,               % show spaces adding particular underscores
+showstringspaces=false,         % underline spaces within strings
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,           % adds a frame around the code
+tabsize=2,          % sets default tabsize to 2 spaces
+captionpos=b,           % sets the caption-position to bottom
+breaklines=true,        % sets automatic line breaking
+breakatwhitespace=false,    % sets if automatic breaks should only happen at whitespace
+escapeinside={\%*}{*)}          % if you want to add a comment within your code
+}
+
 %\singlespacing 
 %\onehalfspacing 
 %\doublespacing 
@@ -132,23 +155,68 @@ au calcul scientifique. Des programmes liés à la physique des matériaux ou à
 ont directement tiré profit des travaux de l'équipe. Il arrive également que des partenariats se
 fassent avec des fabricants de processeurs ou d'autres composants afin de réaliser un travail spécifique
 d'optimisation sur leurs machines.
-\chapter{Première partie du stage : Openmp et Numa}
+\chapter{Première partie du stage : OpenMP et Numa}
 
-Ma mission était initialement liée à la technologie openmp. Openmp est une interface de programmation
+Ma mission était initialement liée à la technologie OpenMP. OpenMP est une interface de programmation
 disponible pour les langages C, C++ et Fortran qui permet de faciliter grandement l'écriture de programmes
 parallèles. Comme nous allons le voir, elle fait intervenir à la fois des techniques de compilation et des
 techniques dynamique, ce qui la place au coeur des thèmes de l'équipe. L'idée était d'étudier le 
-d'applications utilisant openmp sur des architectures particulières. Les machines ciblées étaient de type
-Non Uniform Memory Architecture. Cela signifie que, si chaque processeur a accès à toute la mémoire de la
+d'applications utilisant OpenMP sur des architectures particulières. Les machines ciblées étaient de type
+Non Uniform Memory Architecture. Cela signifie que si chaque processeur a accès à toute la mémoire de la
 machine, il a néanmoins un accès privilégié à une certaine portion de cette mémoire (on parle de noeud) et
 met donc plus de temps à accéder à une donnée stockée dans un autre noeud. Il peut donc y avoir des cas où
 des threads se trouvent obligés d'accéder à une mémoire distante, ce qui aurait peut-être pu être évité. 
 Nous allons donc maintenant :
 \begin{easylist}[checklist]
-   & expliquer plus précisément le fonctionnement d'openmp 
+   & expliquer plus précisément le fonctionnement d'OpenMP 
    & détailler la raison d'être et les enjeux des architectures NUMA
    & montrer l'avancée dans le stage, les solutions déjà existantes et la démarche
    & montrer ce qui nous a poussé à faire évoluer le sujet de travail 
   \end{easylist}
-  \section{openmp : fonctionnement}
+  \section{OpenMP : fonctionnement}
+OpenMP signifie Open Multi-Processing. Il s'agit, comme nous l'avons précisé précédemment, d'une interface 
+de programmation pour les langages C, C++ et Fortran. OpenMP est géré par un consortium, the OpenMP 
+Architecture Review Board. Plus précisément, ce consortium produit une spécification d'OpenMP, donc une 
+liste des comportements et des options auquels un utilisateur peut s'attendre en utilisant OpenMP.
+\\Il existe ensuite différentes implémentations, qui pourront remplir en totalité ou partiellement la 
+dernière version ou une version plus ancienne de la spécification OpenMP. Chaque entreprise, groupe 
+ou entité qui voudrait mettre à disposition sa version d'OpenMP a, même s'il compte respecter à la lettre
+la spécification, une marge de manoeuvre très importante quant à la ``machinerie interne'' de 
+l'application. Certains pourront décider notamment d'optimiser leur implémentation pour un type 
+d'architecture particulière, et pourquoi pas de fournir des outils supplémentaires au programmeur. Il 
+est d'ailleurs arrivé que certains de ces outils se retrouvent ensuite dans une version ultérieure 
+de la spécification.
+\\Nous allons d'abord évoquer OpenMP d'un point de vue utilisateur, afin de donner une meilleure idée 
+de ce qu'il peut apporter. Nous rentrerons ensuite dans les détails techniques de l'implémentation, 
+ce qui permettra de montrer en quoi cette technique fait intervenir une interaction entre la compilation
+et l'exécution.
+
+\subsection{Utilisation}
+
+L'intérêt d'OpenMP est de faciliter l'écriture de programmes parallèles. Plus que cela, il s'agit aussi 
+de rendre ces programmes plus portables en permettant au codeur de s'abstraire de paramètres comme le 
+système d'exploitation de la machine cible (bien qu'il existe des librairies standards de multithreading, 
+de nombreuses fonctionnalités avancées comme l'association d'une tâche à un cpu particulier restent encore
+spécifiques à l'OS), ou le choix du nombre de threads approprié, qui dépend de l'architecture.
+\\L'idée générale est de préciser les régions du code que l'on souhaite exécuter en parallèle. En C et 
+C++, cela se fait au moyen de pragmas. Il s'agit de directives adressées au compilateur, sur des lignes qui 
+commencent par la chaîne \#pragma omp. Une région signalé par un \#pragma omp parallel sera 
+exécutée autant de fois qu'il y aura eu de threads créés par le runtime. Ce nombre correspond généralement 
+au nombre de coeurs de la machine sur laquelle le programme est exécuté. Ainsi, dans le programme 
+ci-dessous, Hello World sera affiché quatre fois si la machine possède quatre coeurs.
+\begin{lstlisting}
+#include <stdio.h>
+
+int main(void)
+{
+    #pragma omp parallel
+    printf("Hello, world.\n");
+    return 0;
+}
+
+
+\end{lstlisting}
+
+De nombreuses autres possibilités sont offertes dans la mesure où les programmes concurrents ont
+généralement besoin de synchronisation.
 \end{document}
