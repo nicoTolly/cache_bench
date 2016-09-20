@@ -40,7 +40,7 @@ monothread-bench/release_obj/*
 report/build/*
 
 cache-simulation/NRU/_build/*
-cache-simulation/NRU/nain.native
+cache-simulation/NRU/main.native
 
 cache-simulation/PLRU/_build/*
 cache-simulation/PLRU/nain.native
