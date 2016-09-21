@@ -742,5 +742,10 @@ d'environnement CPU\_PROC\_BIND à true avant de lancer un programme OpenMP, on 
 garantir qu'un thread ne sera pas déplacé tout au long de l'exécution du programme. On met ainsi une
 sécurité quant à la possibilité qu'un thread puisse être déplacé et donc avoir à accéder à des données
 qu'il avait allouées sur un autre noeud. Il y a même mieux : la spécification OpenMP définit une autre
-variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur le processeur
+variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur des coeurs précis. Ainsi,
+OMP\_PLACES={0;4} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
+coeurs 0 à 4 (exclu). Cette option, déjà présente sur les supports d'exécution de GCC et d'Intel,
+est devenu une part intégrante de la spécification depuis la version 4.0.  On voit ainsi qu'un utilisateur
+avisé a la possibilité de guider le runtime pour obtenir un comportement non aberrant. 
 \end{document}
+
