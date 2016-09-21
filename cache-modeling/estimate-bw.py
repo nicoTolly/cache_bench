@@ -45,7 +45,7 @@ def femp(x, data):
 # approximate a zero with a bisection
 # less efficient than newton, used as a plan B
 def bisect(f, x1, x2, n):
-    if (( abs(x1 - x2) < 0.0001) or ( n > 10000) or (abs(f(x1)) < 0.001):
+    if (( abs(x1 - x2) < 0.0001) or ( n > 10000) or (abs(f(x1)) < 0.001)):
         return x1
     if( f(x1) * f(x2) < 0 ):
         y3 = f( (x1 + x2) / 2)
@@ -102,7 +102,7 @@ def calculate_cache(lThreads, lBw, data):
         bw = f(sum(lThreads))
         lBw.append(bw)
         lThreads.pop(0)
-        return calculate_cache(lThreads, lBw)
+        return calculate_cache(lThreads, lBw, data)
     else:
         try:
             thrsum = sum(lThreads)
@@ -112,7 +112,7 @@ def calculate_cache(lThreads, lBw, data):
             xopt = scipy.optimize.newton_krylov(func, thrsum, f_tol = 1.0)
             lBw.append(f(xopt))
             lThreads.pop(0)
-            return calculate_cache(lThreads, lBw)
+            return calculate_cache(lThreads, lBw, data)
         except ValueError:
             # newton approximation can fail when bw is too big
             # in this case we try to approach a solution
@@ -124,12 +124,12 @@ def calculate_cache(lThreads, lBw, data):
             #bw = lBw[-1]
             #lBw.append(bw)
             lThreads.pop(0)
-            return calculate_cache(lThreads, lBw)
+            return calculate_cache(lThreads, lBw, data)
 
 
 
 
-dataf = open(input_name, "r")
+dataf = open(input_name4, "r")
 line = dataf.readline()
 datakeys = []
 dataval = []
