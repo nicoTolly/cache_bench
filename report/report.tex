@@ -49,7 +49,7 @@ realisé a l'Inria, l'Institut National de Recherche en Informatique et
 Automatique, au sein de l'équipe CORSE (Compilation and Optimisation in Runtime).
 J'ai donc eu affaires naturellement à des problématiques de recherche mais aussi à
 des problématiques d'ingénierie tout au long de ces six mois. Plus précisément, mes travaux ont été
-liées à des problématiques de programmation concurrente et multithreadés. Il s'est agi au départ d'évaluer
+liées à des problématiques de programmation concurrente et multithreadée. Il s'est agi au départ d'évaluer
 le comportement et le partage des ressources sur des architectures dites NUMA, Non-Uniform Memory Access. 
 La problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
 entre différents threads.
@@ -448,6 +448,223 @@ se trouve accéder à un noeud NUMA distant. Si la réponse est affirmative - et
 suffisamment souvent pour être considéré comme pathologique - peut-on améliorer la situation ?
 \\OpenMP ne gère jamais l'allocation des données en mémoire. De fait, les programmes reposent sur 
 l'implémentation présente en local de fonctions comme malloc ou calloc, ou même à plus bas niveau
-d'appels systèmes comme mmap.
+d'appels systèmes comme mmap. Une partie de mon travail a consisté à décrypter les interactions
+entre chacun de ces composants : quand un programme s'éxécutant sur un cpu donné alloue une variable,
+à quel moment et dans quelle partie de la mémoire elle sera réellement enregistrée ? Il m'a également fallu
+décrypter le fonctionnement du support d'exécution OpenMP et notamment sa tactique quant à la migration de
+tâches (un problème que nous allons expliquer ensuite). Enfin, une partie importante était de réaliser des 
+benchmarks pour évaluer les pertes éventuelles dues à des accès à une mémoire distante. 
+\\J'ai eu accès, dans le cadre de mes travaux, à une architecture NUMA appartenant à l'université de 
+Grenoble. Cette machine, appelée Idchire, dispose de 192 coeurs répartis sur 24 noeuds NUMA distincts. C'est
+sur cette machine que j'ai réalisé les expériences que je décris dans cette partie.
 
+\subsection{Politique d'accès mémoire sur une machine NUMA}
+
+Comme nous l'avons dit, l'allocation des données en mémoire est indépendante du support d'exécution OpenMP.
+Néanmoins, une connaissance claire de cette politique, de l'endroit et du moment où une donnée sera écrite
+en mémoire est nécessaire si l'on veut appréhender comment les mécanisme d'OpenMP vont interagir avec ce
+problème. Pour profiter de l'architecture NUMA, l'implémentation d'une politique spécifique est bien 
+entendu requise : il faut maximiser la localité des données et faire en sorte que les accès locaux soient
+la norme plutôt que l'exception. 
+\\Commençons par faire un rappel sur le système de mémoire virtuelle des systèmes d'exploitations modernes.
+Les premiers ordinateurs laissaient leurs programmes accéder directement à la mémoire physique de leur
+système. Cela posaient de nombreux problèmes, le plus important étant celui de l'isolation des processus.
+Ainsi, un programme avait la possibilité de modifier les données d'un programme voisin. Ceci représentait
+une faille de sécurité majeure, dans la mesure où des programmes importants pouvaient se trouver invalidés
+par le travail d'un processus annexes. Une attention toute particulière devait être accordée aux accès 
+à la mémoire.
+\\Pour remédier à ce problème, les informaticiens ont inventé dans les années 1960 le principe de la 
+mémoire virtuelle. La mémoire physique est divisée en ``blocs'' d'une taille donnée qu'on appelle
+des pages. Lorsqu'il souhaite obtenir de la mémoire, un processus va en faire la demande au système
+d'exploitation, par le biais d'un appel système comme mmap. Dans l'hypothèse où il possède la mémoire 
+disponible, celui-ci va alors lui attribuer un nombre de pages contenant la quantité de mémoire 
+demandée. Un autre processus ne pourra, sauf appel à un mécanisme spécifique de partage de mémoire, 
+accéder aux données stockées dans ces pages, réglant ainsi la question de l'isolation mémoire. Le 
+système de mémoire virtuelle présente d'autres avantages, dont celui de pouvoir utiliser la mémoire 
+de masse (comme un disque dur) comme extension de la mémoire vive par un mécanisme de swap : dans 
+la situation où plus de pages sont attribuées qu'il n'y a de place disponible en mémoire vive, les 
+pages surnuméraires sont déplacées vers le disque dur, puis rapatriées lorsque les programmes veulent
+y accéder. Dans la mesure où l'accès au disque dur est plus lent que l'accès à la mémoire principale,
+ce mécanisme a un impact fort sur la performance.
+\\Pour pouvoir associer une adresse virtuelle et une adresse physique, on maintient une table des 
+pages qui retient donc l'emplacement d'une page donnée en mémoire physique ainsi que l'identité
+du processus propriétaire de chacune des pages. C'est le rôle de la MMU (Memory Management Unit),
+une des composantes de l'architecture matérielle. La table des pages est stockée en mémoire, mais
+une partie est maintenue dans un cache spécifique appelé le TLB (Translation Lookaside Buffer).
+\\Le système de pages pose la question du choix de la taille de page appropriée. Une page trop petite
+oblige les processus à faire très souvent appel au système d'exploitation et donc à déclencher un
+``context switch'', ce qui est coûteux en terme de performance. D'un autre côté, une page trop large
+va entraîner une forte fragmentation de la mémoire, dans la mesure où beaucoup de processus 
+n'utiliseront qu'une petite fraction de l'espace qui leur aura été attribué. Le choix de la taille
+de pages est donc le résultat d'un compromis entre ces deux facteurs. Aujourd'hui, une page est 
+typiquement constituée de 4 Kibioctets par défaut. Cependant, la plupart des architectures propose
+la possibilité d'utiliser des pages plus grandes, parfois de plusieurs mebioctets ou même d'un ou
+plusieurs gibioctets. Cette option est désignée par le terme ``huge pages''.
+\\Revenons aux architectures NUMA. Dans une architecture uniforme classique, l'emplacement d'une
+page en mémoire ne fait pas de différence dans la mesure où l'accès à la mémoire est partout identique.
+Comme on l'a déjà expliqué, il n'en va pas ainsi pour une architecture NUMA où l'accès local est plus
+rapide. La politique de choix de l'emplacement de la page est gérée par l'appel système et dépend
+donc de l'implémentation de celui-ci, qui va bien entendu varier selon les systèmes d'exploitation.
+Cependant, le principe général est le suivant : les pages sont allouées selon une politique ``paresseuse''
+dite ``first touch''. Une allocation mémoire n'est pas faite au moment de l'allocation proprement dite
+(c'est-à-dire de l'appel à malloc) mais seulement au moment où cette donnée sera accédée pour la première
+fois. On délaie ainsi au maximum le travail proprement dit d'allocation. Cela permet aussi, dans 
+l'hypothèse où le programmeur aurait alloué plus d'espace qu'il n'en utilise réellement, de ne payer que
+pour les données réellements accédées. Dans le cas d'une machine NUMA, on apporte la garantie supplémentaire
+que la page demandée sera allouée sur le noeud du processeur qui a réalisé le premier accès à la variable.
+On espère ainsi faire en sorte que les données soient allouées sur les noeuds où elles seront le plus
+souvent accédés.
+\\J'ai cherché à vérifier ce qu'il en était sur la machine que j'avais à disposition. Il existe une fonction
+bas niveau permettant, selon les paramètres, de déplacer une page vers un noeud donné, ou encore d'obtenir 
+le noeud sur lequel cette page se trouve au moment de l'appel : il s'agit de move\_pages. Ainsi l'appel
+suivant :
+
+\begin{lstlisting}
+#include <stdio.h>
+#include <stdlib.h>
+#include <numaif.h>
+#include <unistd.h>
+#include <hwloc.h>
+
+int main()
+{
+	int *ptr;
+	intptr_t  ptr_align;
+
+	// get page size in bytes
+	int psize = getpagesize();
+	ptr = malloc(25*sizeof(int));
+	*ptr = 4;
+	// align pointer on page boundaries
+	ptr_align = (intptr_t)ptr & ~(psize - 1);
+	// move_page returns 0 in case of success
+	// and set status to the node number where 
+	// ptr is located when fourth argument
+	// is NULL
+	if ( move_pages(0, 1, (void **)&ptr_align, NULL, status, 0) == 0)
+		printf("memory is at node %d\n", status[0]);
+	return 0;
+}
+
+\end{lstlisting}
+
+Ce programme permet donc de connaître le noeud sur lequel se situent nos données. J'ai utilisé une bibliothèque
+développé par l'Inria appelée hwloc (pour hardware locality) qui offre de nombreuses abstractions pour 
+travailler à bas niveau sur des questions d'architectures (on peut ainsi récupérer des informations sur 
+la machine sur laquelle le programme est exécuté, ou encore déplacer des threads ou des processus d'un coeur
+à un autre). Elle m'a servi à imposer à mon programme de s'exécuter sur le CPU 0, situé logiquement sur le
+noeud 0. Voici donc le programme que j'ai exécuté :
+
+\begin{lstlisting}
+#include <stdio.h>
+#include <stdlib.h>
+#include <numaif.h>
+#include <unistd.h>
+#include <hwloc.h>
+
+int main()
+{
+	int *ptr;
+	intptr_t  ptr_align;
+
+	hwloc_topology_t topology;
+	hwloc_cpuset_t  set1;
+
+	//initiating locality informations
+	hwloc_topology_init(&topology);
+	hwloc_topology_load(topology);
+	
+	
+	//setting process on cpu 0 with hwloc
+	set1 = (hwloc_cpuset_t) hwloc_bitmap_alloc();
+	hwloc_bitmap_set(set1, 0);
+	hwloc_set_cpubind(topology, (hwloc_const_cpuset_t)set1, HWLOC_CPUBIND_PROCESS);
+
+
+	// get page size in bytes
+	int psize = getpagesize();
+	ptr = malloc(25*sizeof(int));
+	*ptr = 4;
+	// align pointer on page boundaries
+	ptr_align = (intptr_t)ptr & ~(psize - 1);
+	// move_page returns 0 in case of success
+	// and set status to the node number where 
+	// ptr is located when fourth argument
+	// is NULL
+	if ( move_pages(0, 1, (void **)&ptr_align, NULL, status, 0) == 0)
+		printf("memory is at node %d\n", status[0]);
+	return 0;
+}
+
+\end{lstlisting}
+En exécutant ce programme, j'ai eu la surprise de voir que le noeud indiqué n'était pas
+nécessairement, et même rarement, le noeud 0. Le noeud semblait plutôt être
+choisi aléatoirement. Je me suis d'abord demandé si la politique de first touch était 
+effectivement implémentée ici. Cependant, après discussion avec d'autres membres de l'équipe,
+j'ai fini par trouver l'explication. En fait, l'implémentation de malloc, avant de demander
+l'allocation d'une nouvelle page, cherche logiquement à savoir si le processus ne dispose
+pas déjà de la place nécessaire. Dans cette situation, une page a déjà été allouée au processus
+au moment où il a été lancé, et comme elle dispose de suffisamment d'espace libre, c'est sur elle
+que l'on a alloué le tableau d'entier ptr. Il faut donc faire un malloc d'un tableau suffisamment
+grand pour pouvoir dépasser la capacité de la première page. C'est ce que je fais dans la version
+suivante : 
+
+\begin{lstlisting}
+#include <stdio.h>
+#include <stdlib.h>
+#include <numaif.h>
+#include <unistd.h>
+#include <hwloc.h>
+
+int main()
+{
+	int *ptr, * ptr2;
+	intptr_t  ptr_align;
+	intptr_t  ptr_align2;
+
+	hwloc_topology_t topology;
+	hwloc_cpuset_t  set1;
+
+	//initiating locality informations
+	hwloc_topology_init(&topology);
+	hwloc_topology_load(topology);
+	
+	
+	//setting process on cpu 0 with hwloc
+	set1 = (hwloc_cpuset_t) hwloc_bitmap_alloc();
+	hwloc_bitmap_set(set1, 0);
+	hwloc_set_cpubind(topology, (hwloc_const_cpuset_t)set1, HWLOC_CPUBIND_PROCESS);
+
+
+	// get page size in bytes
+	int psize = getpagesize();
+	// alloc first pointer and make an acces
+	ptr = malloc(25*sizeof(int));
+	*ptr = 4;
+	// alloc second pointer and make an acces
+	ptr2 = malloc(2000*sizeof(int));
+	*ptr2 = 12;
+	// align pointer on page boundaries
+	ptr_align = (intptr_t)ptr & ~(psize - 1);
+	ptr_align2 = (intptr_t)ptr2 & ~(psize - 1);
+	// move_page returns 0 in case of success
+	// and set status to the node number where 
+	// ptr is located when fourth argument
+	// is NULL
+	if ( move_pages(0, 1, (void **)&ptr_align, NULL, status, 0) == 0)
+		printf("memory is at node %d\n", status[0]);
+	if ( move_pages(0, 1, (void **)&ptr_align2, NULL, status, 0) == 0)
+		printf("memory is at node %d\n", status[0]);
+	return 0;
+}
+
+\end{lstlisting}
+
+Cette fois, si le premier tableau pointe bien un emplacement situé sur un noeud aléatoire,
+le deuxième pointe bien une page située sur le noeud 0, celui qu'on attendait. On a donc
+bien confirmé la politique d'allocation attendue.
+\\La conséquence immédiate de ces observations est qu'un accès à des données distantes ne peut
+se produire que dans le cas où un travail entamé sur un coeur donné se poursuivrait sur un autre.
+On va voir dans la suite que ce cas peut se produire avec un programme OpenMP dans certaines
+situations.
 \end{document}
