@@ -455,8 +455,8 @@ décrypter le fonctionnement du support d'exécution OpenMP et notamment sa tact
 tâches (un problème que nous allons expliquer ensuite). Enfin, une partie importante était de réaliser des 
 benchmarks pour évaluer les pertes éventuelles dues à des accès à une mémoire distante. 
 \\J'ai eu accès, dans le cadre de mes travaux, à une architecture NUMA appartenant à l'université de 
-Grenoble. Cette machine, appelée Idchire, dispose de 192 coeurs répartis sur 24 noeuds NUMA distincts. C'est
-sur cette machine que j'ai réalisé les expériences que je décris dans cette partie.
+Grenoble. Cette machine, appelée Idchire, dispose de 192 coeurs répartis sur 24 noeuds NUMA distincts. 
+C'est sur cette machine que j'ai réalisé les expériences que je décris dans cette partie.
 
 \subsection{Politique d'accès mémoire sur une machine NUMA}
 
@@ -664,7 +664,88 @@ Cette fois, si le premier tableau pointe bien un emplacement situé sur un noeud
 le deuxième pointe bien une page située sur le noeud 0, celui qu'on attendait. On a donc
 bien confirmé la politique d'allocation attendue.
 \\La conséquence immédiate de ces observations est qu'un accès à des données distantes ne peut
-se produire que dans le cas où un travail entamé sur un coeur donné se poursuivrait sur un autre.
+se produire que dans le cas où un travail commencé sur un coeur donné se poursuivrait sur un autre.
 On va voir dans la suite que ce cas peut se produire avec un programme OpenMP dans certaines
 situations.
+
+\subsection{OpenMP et localité des données}
+On va s'intéresser ici à la manière dont un programme OpenMP va gérer la question de la localité
+d'un programme - sur quel coeur ce programme va s'exécuter, est-il susceptible de migrer d'un coeur
+vers un autre. On se heurte ici à une difficulté déjà évoquée auparavant : les détails de 
+fonctionnement de ce genre n'étant pas mentionnés dans la spécification, ils sont spécifiques à 
+chaque implémentation. Il nous faut donc maintenant choisir une implémentation particulière 
+de OpenMP pour pouvoir avancer plus loin dans l'étude. On s'intéresse ici plutôt à des propriétés
+de l'exécution et donc du support d'exécution OpenMP. Plusieurs choix sont possibles : le plus
+classique étant l'implémentation de GCC. Autre possibilité : le support développé en open-source 
+par Intel, qui a été choisi par les développeurs de Clang (le compilateur open-source lancé par
+Apple) comme son support d'exécution officiel. On pourrait aussi prendre l'un des supports 
+d'exécution développés par l'Inria, Kaapi et StarPU. Kaapi est tout particulièrement intéressant
+dans la mesure où des membres de Corse travaillent à plein temps dessus. D'autres supports existent,
+mais ils sont a priori moins intéressants.
+\\Après réflexion et consultation d'autres membres de l'équipe, mon choix s'est finalement porté
+sur le support d'exécution de Clang/Intel. Les facteurs décisifs ont été que ce code était 
+apparemment plus facile d'entrée notamment que celui de GCC, ou que celui de Kaapi qui n'est 
+pas encore suffisamment documenté. De plus, le fait que ce runtime soit d'utilisation répandue
+rend plus facile de trouver de l'aide ou des renseignements sur internet. Ce choix ne nous interdit
+pas d'aller regarder le fonctionnement d'autres runtime quand ils ont été spécifiquement conçus pour
+les cas qui nous préoccupent.
+\\Commençons par préciser la définition des termes que l'on va utiliser. En informatique, un thread
+est une séquence d'instructions. Il s'agit de la plus petite séquence d'instruction qui peut être
+géré de manière indépendante par un ordonnanceur. Il s'agit d'un concept proche de celui de 
+processus, à une différence près : un processus possède un espace propre en mémoire virtuelle, ce
+qui implique que deux processus ne peuvent interagir que par le biais d'un passage de messages.
+Au contraire, un thread partage avec d'autres threads une même portion de mémoire virtuelle, ce 
+qui rend possible pour deux threads de modifier la même variable. Par ailleurs, il faut distinguer
+ce concept de multithreading de celui de multithreading hardware, qui est lié mais néanmoins
+distinct : en termes d'architecture, le multithreading désigne la capacité d'une unité de calcul
+(Central Processing Unit) à exécuter simultanément plusieurs threads logiques. Toujours en termes
+d'architecture, il n'existe pas de consensus absolu pour différencier les concepts de CPU,
+processeurs ou coeurs, autant de termes dont la signification peut varier selon les constructeurs
+ou le contexte. On parlera surtout ici de noeud (pour les noeuds NUMA déjà évoqués au-dessus) 
+ainsi que de coeur, dans le sens ``unité de calcul élémentaire'', en gardant à l'esprit que 
+plusieurs coeurs peuvent partager des ressources comme des caches à différents niveaux. On se 
+contentera, lorsque ce sera pertinent, de préciser quelles ressources sont partagées entre
+quels coeurs, sans plus se soucier de la terminologie exacte.
+\\Revenons à OpenMP et à son support d'exécution. Ce dernier se charge de créer un nombre de 
+threads logiques qui lui semble approprié avant de leur répartir le travail, d'une façon que
+l'on va discuter plus tard. Une remarque d'abord : le système d'exploitation a toujours la 
+main sur l'ordonnancement des threads. C'est bien entendu son rôle de répartir au mieux les
+ressources entre chacun des programmes essayant de s'éxécuter. Il peut donc à loisir arrêter,
+redémarrer ou déplacer à tout moment n'importe quel thread en exécution. Cela peut potentiellement
+poser problème même si, en pratique, les politiques d'ordonnancement sur NUMA semble éviter les 
+déplacements dispensables de threads pour profiter au mieux de la localité. Cependant, les systèmes
+d'exploitations, et notamment linux, offrent des outils qui permettent d'imposer à un thread logique
+de rester sur un certain emplacement physique : il s'agit de la fonction pthread\_setaffinity\_np. Le
+np signifie ``non-portable'' car la fonction n'est pas POSIX, mais seulement spécifique à linux.
+
+\begin{lstlisting}[label={lst:setaff}]
+#define _GNU_SOURCE
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main()
+{
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) == 0)
+    printf("successfully pinned current thread on cpu 0\n");
+  return 0;
+}
+\end{lstlisting}
+Le code présenté dans \ref{lst:setaff} donne un exemple basique de son utilisation et se contente de
+déplacer et de fixer le thread courant vers le coeur 0.
+\\OpenMP offre aux utilisateurs une option pour profiter de ce mécanisme. En définissant la variable
+d'environnement CPU\_PROC\_BIND à true avant de lancer un programme OpenMP, on demande au runtime de 
+garantir qu'un thread ne sera pas déplacé tout au long de l'exécution du programme. On met ainsi une
+sécurité quant à la possibilité qu'un thread puisse être déplacé et donc avoir à accéder à des données
+qu'il avait allouées sur un autre noeud. Il y a même mieux : la spécification OpenMP définit une autre
+variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur des coeurs précis. Ainsi,
+OMP\_PLACES={0;4} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
+coeurs 0 à 4 (exclu). Cette option, déjà présente sur les supports d'exécution de GCC et d'Intel,
+est devenu une part intégrante de la spécification depuis la version 4.0.  On voit ainsi qu'un utilisateur
+avisé a la possibilité de guider le runtime pour obtenir un comportement non aberrant. 
 \end{document}
+
