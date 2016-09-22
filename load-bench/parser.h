@@ -54,7 +54,7 @@ class ThrParam
 	ThrParam(int nbThread, int nbSlow, bool close);
 	ThrParam(int nbThread, int nbSlow, bool close, int siz);
 	ThrParam(int nbThread, int nbSlow, bool close, int siz, float ratio);
-	ThrParam(int nbThread, int** thrSize);
+	ThrParam(int nbThread, int** thrSize, int nbSlw, bool close);
 	//destructor
 	~ThrParam();
 

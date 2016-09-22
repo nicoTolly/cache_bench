@@ -13,7 +13,7 @@ fname = 'thread-sizes.txt'
 rname = "results"
 binpath = "../load"
 
-nbThr = 5
+nbThr = 8
 
 rname += str(nbThr)
 rname += ".txt"

@@ -91,7 +91,7 @@ ThrParam::ThrParam(int nbT, int nbSlw, bool close, int fsiz, float ratio):fsiz(f
 }
 
 
-ThrParam::ThrParam(int nbT, int **thrS):fsiz(NDEFAULT),ssiz(NDEFAULT), nbSlow(0),close(true), thrSizes(*thrS) 
+ThrParam::ThrParam(int nbT, int **thrS, int nbSlw, bool close):fsiz(NDEFAULT),ssiz(NDEFAULT), close(close), thrSizes(*thrS), nbSlow(nbSlw)
 {
 	int res;
 
@@ -300,7 +300,7 @@ int parseArg(int argc, char * args[], ThrParam **param)
 		if (thrSizes == NULL)
 			*param = new ThrParam(nbThread, nbSlow, close, siz, ratio);
 		else
-			*param = new ThrParam(nb, &thrSizes);
+			*param = new ThrParam(nb, &thrSizes, nbSlow, close);
 	}
 	// case nbThread > nbSlow
 	catch (exception& e)

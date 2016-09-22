@@ -258,7 +258,8 @@ int main(int argc, char ** argv)
 	else
 	{
 		intptr_t offset = param->thrSizes[0];
-		for(int i = 1; i < param->nbThread; i++)
+		int i;
+		for( i = 1; i < nbFst; i++)
 		{
 			//padding with adding_var doubles
 			hargs[i].t = tab + offset ;
@@ -269,6 +270,19 @@ int main(int argc, char ** argv)
 			hargs[i].time = times + i; 
 			hargs[i].cycle = cycles + i; 
 			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
+			offset +=  param->thrSizes[i];
+		}
+		for(; i < param->nbThread; i++)
+		{
+			//padding with adding_var doubles
+			hargs[i].t = tab + offset ;
+			hargs[i].bar = &bar; 
+			hargs[i].size = param->thrSizes[i]; 
+			//hargs[i].niter = nb_iter; 
+			hargs[i].niter = iter[i]; 
+			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
+			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
 			offset +=  param->thrSizes[i];
 		}
 	}
@@ -348,7 +362,11 @@ int main(int argc, char ** argv)
 	else
 	{
 		hargs[0].size = param->thrSizes[0];
-		handler((void *)&hargs[0]);
+		if(param->nbThread == param->nbSlow)
+			handler_slw((void *)&hargs[0]);
+		else
+			handler((void *)&hargs[0]);
+			
 
 	}
 
@@ -433,7 +451,7 @@ void * handler_slw(void * arg)
 	cyc = get_cycles();
 	time = mysecond();
 #ifdef USE_AVX
-	load_asm_slw(args->t, args->size, args->niter);
+	load_asm(args->t, args->size, args->niter);
 #else
 #endif
 	//load_asm(args->t, args->size, args->niter);
@@ -441,9 +459,7 @@ void * handler_slw(void * arg)
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
 	*(args->cycle) = cyc;
-	printf("Slow thread has taken %11.8f s to execute, data : %ld bytes\n \
-Throughput :%f %cB/s \n", time, args->size * sizeof(double),  siz_d(ld / time), units_d(ld / time));
-	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes loaded %ld times\n \
+	printf("Slow thread has taken %11.8f s to execute on cpu %d, data : %ld bytes loaded %ld times\n \
 Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter, siz_d(ld / time), units_d(ld / time));
 	return NULL;
 }
