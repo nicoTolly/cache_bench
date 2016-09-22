@@ -13,7 +13,7 @@ fname = 'thread-sizes.txt'
 rname = "results"
 binpath = "../load"
 
-nbThr = 3
+nbThr = 8
 
 rname += str(nbThr)
 rname += ".txt"
@@ -49,7 +49,7 @@ step = 20000
 for i in range(nbThr):
     f.write('{0}\n'.format(base))
 
-for i in range(40):
+for i in range(170):
     f.seek(0)
     size = int(f.readline()) 
     gendata( 8 * size, f)
