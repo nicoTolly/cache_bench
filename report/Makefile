@@ -1,7 +1,7 @@
 ROOT=.
 BIN_DIR=build
 BIN=$(BIN_DIR)/report.pdf
-SRC=$(ROOT)/report.tex
+SRC=$(ROOT)/report.tex $(ROOT)/report.bib
 
 .PHONY: all
 .PHONY: mrproper
@@ -9,8 +9,10 @@ SRC=$(ROOT)/report.tex
 all: $(BIN)
 
 $(BIN): $(SRC)
-	pdflatex -output-directory=$(BIN_DIR) $< 
+	pdflatex -output-directory=$(BIN_DIR) $< && bibtex $(BIN_DIR)/report && pdflatex -output-directory=$(BIN_DIR) $< 
 
+$(ROOT)/report.bib:
+	bibtex $(BIN_DIR)/$< 
 
 
 mrproper:

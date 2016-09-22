@@ -4,6 +4,7 @@
 \usepackage{setspace} 
 \usepackage[ampersand]{easylist}
 
+\usepackage{cite}
 \usepackage{graphicx}
 \graphicspath{{images/}}
 
@@ -743,9 +744,72 @@ garantir qu'un thread ne sera pas déplacé tout au long de l'exécution du prog
 sécurité quant à la possibilité qu'un thread puisse être déplacé et donc avoir à accéder à des données
 qu'il avait allouées sur un autre noeud. Il y a même mieux : la spécification OpenMP définit une autre
 variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur des coeurs précis. Ainsi,
-OMP\_PLACES={0;4} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
+OMP\_PLACES=\{0;4\} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
 coeurs 0 à 4 (exclu). Cette option, déjà présente sur les supports d'exécution de GCC et d'Intel,
 est devenu une part intégrante de la spécification depuis la version 4.0.  On voit ainsi qu'un utilisateur
-avisé a la possibilité de guider le runtime pour obtenir un comportement non aberrant. 
+avisé a la possibilité de guider le runtime pour obtenir un comportement plus optimal que ce que serait
+le comportement par défaut. 
+\\Ce n'est cependant pas tout à fait le seul problème. Il faut maintenant parler de la manière dont
+OpenMP répartit les tâches sur les différents coeurs. À partir de maintenant, sauf indication 
+contraire, le comportement que je vais expliquer est valable pour le runtime développé par Intel, quand
+bien même les autres runtimes ont généralement des stratégies similaires. Le runtime fait une distinction
+entre les threads (l'unité logique d'exécution déjà définie) et les tâches (le travail - donc la suite
+d'instructions - qui doit effectivement être réalisé). Les threads jouent, en quelque sorte, le rôle
+de support sur lesquels les tâches s'exécuteront. Cependant, on ne peut savoir a priori sur quel thread
+et donc sur quel coeur les tâches seront exécutées.
+\\Décrivons un peu mieux ce fonctionnement. On a déjà décrit le processus d'outlining qui permet au
+runtime de récupérer le code à paralléliser isolé par le compilateur. Ces fonctions outlinées 
+représentent les tâches qui devront être exécutés par les différents threads. Au moment du premier
+appel au runtime, le premier thread va créer plusieurs autres threads et éventuellement les placer
+sur différents coeurs si cela a été demandé. Chaque thread maintient une file de tâche qu'il va
+exécuter au fur et à mesure. La file est initialement vide pour tout le monde. Le premier thread
+(le thread master) va remplir sa propre file avec les tâches qui ont été isolées par le compilateur.
+Le mécanisme d'exécution est le suivant pour tous les threads : s'il y a une tâche dans la queue,
+l'exécuter. Sinon, choisir un autre thread au hasard, regarder s'il a des tâches dans sa file et si
+oui, lui en ``voler'' une. Si la file du thread choisi est vide, on en prend un autre au hasard. 
+Dès le moment où on a trouvé une file de thread remplie, on la retient pour aller chercher de 
+nouvelles tâches ensuite. 
+\\Ce comportement est le même que le comportement par défaut sur Kaapi. S'il aurait pu sembler
+plus logique, de prime abord, de privilégier le vol de tâche au thread master, dont on sait
+qu'il possède toutes les tâches au départ, il a en fait le fait d'éviter un trop grand 
+nombre d'accès concurrent à une même ressource globale (en l'occurrence, la file du thread
+master). Ceci implique qu'on ne peut pas prévoir sur quel coeur sera exécutée une tâche 
+particulière. La politique de first touch expliquée dans le chapitre précédent rend ce 
+fait peu gênant quand une tâche n'accède qu'à des données qui lui sont privées et qui seront
+donc allouées sur le noeud où elle s'exécute. Reste deux problèmes potentiels : premièrement,
+le cas où plusieurs tâches partagent des données en commun. Dans cette configuration, si les
+threads exécutant ces tâches sont situés sur des noeuds différents, on aura nécessairement
+affaire à des accès distants. Le meilleur moyen de régler ce souci est de mettre à profit
+les variables de placement des threads évoquées au dessus. Si le programmeur sait que son
+programme contient de très nombreux accès à des variables partagées (ce qu'il est en général
+préférable d'éviter) il lui suffit de demander que tous les threads soient situés sur le même
+noeud. Bien sûr, cette approche a des inconvénients. En faisant ainsi, on limite de fait le
+nombre de threads au nombre de coeurs présents sur un noeud dans l'optique où l'on veut rester
+efficace. Plus important, cette approche suppose une connaissance préalable du programme non pas
+du programmeur, mais de l'utilisateur, ce qui est bien sûr loin d'être évident et même relativement
+rare. Deuxièmement, on a le cas où une tâche serait interrompue et reprise par un autre thread (c'est
+notamment possible lorsqu'une tâche atteint une barrière). Dans ce cas, on peut envisager que la tâche
+reprenne sur un noeud différent que celui sur laquelle elle avait commencé, et donc qu'il y aura accès 
+à distance pour les données de cette tâche.
+\\Pour ce dernier problème, plusieurs implémentations ont apporté des éléments de réponse. On peut
+parler notamment d'un autre travail provenant de Inria Bordeaux appelé ForestGOMP \cite{forest}. Ce runtime
+est spécifiquement conçu pour tirer le meilleur parti des architectures NUMA. En l'occurrence, les threads
+sont rassemblés en ``bubbles'' qui correspondent à une notion de localité. Par exemple, des threads 
+s'exécutant sur un même noeud seront placés dans la même ``bulle''. Les bulles peuvent être imbriquées : 
+Si plusieurs threads dans une bulle partagent une ressource supplémentaire, comme un cache, ils pourront
+alors être placés dans une nouvelle bulle à l'intérieur de la première.Dès lors, lorsqu'un thread se 
+retrouve inactif et chercher à voler une tâche, il regardera en premier dans la bulle la plus interne,
+puis dans la bulle de niveau supérieur, jusqu'à trouver un thread à qui prendre du travail. De la sorte,
+on maximise les chances qu'une tâche soit volée par un thread proche physiquement du thread qui en avait
+commencé l'exécution.
+\\Voilà ce qu'il en est des questions de localité avec OpenMP. Dans le cas du runtime d'Intel, aucune 
+stratégie spécifique n'est implémentée pour éviter les problèmes d'accès distants. Cependant, les différents
+mécanismes annexes - le first touch, notamment - semblent constituer de bons garde-fous et permettent
+a priori de limiter les cas pathologiques, même s'il est difficile de quantifier la probabilité de se
+retrouver dans ce genre de conditions. 
+\subsection{Évaluation de la pénalité d'un accès distant}
+J'ai également cherché à mesurer quel perte on pouvait attendre d'un accès NUMA à distance. Pour cela, j'ai
+cherché à réaliser des benchmarks mesurant le temps d'accès successifs à des données en mémoire.
+\bibliographystyle{plain}
+\bibliography{report}
 \end{document}
-
