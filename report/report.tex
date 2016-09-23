@@ -810,6 +810,46 @@ retrouver dans ce genre de conditions.
 \subsection{Évaluation de la pénalité d'un accès distant}
 J'ai également cherché à mesurer quel perte on pouvait attendre d'un accès NUMA à distance. Pour cela, j'ai
 cherché à réaliser des benchmarks mesurant le temps d'accès successifs à des données en mémoire.
+\\La question s'est révélée plus compliquée que je ne l'avais anticipé et les questions qui se sont posées
+étaient assez nombreuses. Dans la mesure où le travail fait ici a été réinvesti dans la partie suivante du
+stage (de manière mieux construite et plus cohérente), il est plus simple que tout soit expliqué dans 
+la partie suivante, qui évoque mon travail pour construire un benchmark qui évalue la bande-passante mémoire
+sur une architecture donnée. 
+\\On va simplement décrire ici sommairement le principe du benchmark. Un tableau de flottants double précision
+est alloué et initialisé. Ensuite, un nombre déterminé de threads est créé (avec OpenMP). Chaque thread va 
+rapatrier en boucle les données d'une portion de ce tableau dans ses registres. On mesure le temps mis par
+chaque thread pour effectuer l'opération, et on en déduit une vitesse de load. En fixant les threads sur les
+coeurs qu'on veut, on peut comparer les débits atteints selon que les coeurs rapatrient des données depuis leur
+noeud ou depuis un noeud distant. Les détails techniques de l'implémentation seront discutés dans la partie 
+suivante. Il suffit simplement de savoir que, au vu de résultats qui se sont a posteriori révélés être moins 
+pertinents que je ne l'imaginais, les écarts de performances semblaient mieux s'expliquer par des effets
+liés au cache et à son partage qu'à des accès distants à la mémoire.
+\section{Évolution du sujet}
+
+On avait donc affaire à plusieurs problèmes : d'abord, les seules questions soulevées par l'écriture d'un
+benchmark servant à évaluer la bande-passante mémoire méritait à elles-seules une attention particulière.
+Ensuite, la question de l'intérêt du travail en lui-même s'est posé : des solutions avaient déjà été 
+conçues pour parer au problème général de l'utilisation d'OpenMP sur une architecture NUMA, quand bien
+même ces solutions n'étaient pas implémentées sur le runtime d'Intel. À propos de ce support d'exécution,
+l'appropriation du code et de son fonctionnement s'est avérée plus longue et plus fastidieuse que prévu.
+En effet, le code, relativement volumineux (plusieurs centaines de milliers de lignes, ce qui n'est pas
+forcément énorme comparé à d'autres projets mais reste assez peu accessible) est relativement peu documenté,
+dans le sens où il manque, de l'aveu même des développeurs sur le forum dédié, une description du 
+fonctionnement globale du programme. De ce fait, la simple compréhension et description du fonctionnement
+a déjà pris un certain temps et l'idée d'ajouter des fonctionnalités au code devenait plus compliquée à
+envisager. La question de l'intérêt proprement dit des améliorations que l'on souhaitait apporter se posait
+aussi, dans la mesure où le cas paraissait trop particulier et sans doute trop rare pour pouvoir justifier
+les efforts d'implémentation d'une solution. De plus, les résultats des tests ne semblaient pas aller dans 
+un sens justifiant la poursuite des travaux.
+\\Après discussion avec mes tuteurs, nous avons donc décider de recadrer le travail dans une direction 
+sensiblement différente. Fabrice Rastello, le chef de l'équipe, s'intéressait aux phénomènes de caches
+qui pouvaient se produire lorsqu'un cache était partagé entre plusieurs threads. Il s'agissait d'abord
+de réaliser un benchmark, en se basant sur les travaux déjà réalisés, permettant d'évaluer les vitesses
+de load atteintes par plusieurs threads se partageant un cache et accédant à des données de taille 
+variable (notamment, plus ou moins grande que le cache). Dans un deuxième temps, on voulait essayer de
+construire un modèle permettant d'estimer a priori les performances atteignables dans différentes 
+situations de partage. C'est donc là-dessus que j'ai recentré mon travail pour le reste du stage.
+
 \bibliographystyle{plain}
 \bibliography{report}
 \end{document}
