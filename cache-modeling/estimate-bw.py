@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import scipy.optimize
 import numpy
 import re
@@ -10,6 +11,9 @@ input_name = "results1.txt"
 input_name2 = "results2.txt"
 input_name3 = "results3.txt"
 input_name4 = "results4.txt"
+
+class NoArgException(Exception):
+    pass
 
 # get a continuous and differentiable function
 # from a data set
@@ -119,7 +123,7 @@ def calculate_cache(lThreads, lBw, data):
             # by a bisection method
             def func(x):
                 return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
-            xopt = bisect(func, lThreads[0], thrsum, 0)
+            xopt = bisect(func, lThreads[0], 2 * thrsum, 0)
             lBw.append(f(xopt))
             #bw = lBw[-1]
             #lBw.append(bw)
@@ -128,20 +132,23 @@ def calculate_cache(lThreads, lBw, data):
 
 
 
+try:
+    datafile = sys.argv[1]
+except:
+    raise NoArgException("you must give a data file as input")
 
-dataf = open(input_name4, "r")
-line = dataf.readline()
-datakeys = []
-dataval = []
-data = dict()
-# retrieve data from files
-while(line ):
-    l = line.split()
-    data[int(l[0])]= float(l[1])
-    datakeys.append(int(l[0]))
-    dataval.append(float(l[1]))
+with open(datafile, "r") as dataf:
     line = dataf.readline()
-dataf.close()
+    datakeys = []
+    dataval = []
+    data = dict()
+    # retrieve data from files
+    while(line ):
+        l = line.split()
+        data[int(l[0])]= float(l[1])
+        datakeys.append(int(l[0]))
+        dataval.append(float(l[1]))
+        line = dataf.readline()
 
 
 thrlist = get_threads()
