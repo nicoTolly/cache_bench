@@ -8,6 +8,9 @@
 \usepackage{graphicx}
 \graphicspath{{images/}}
 
+\usepackage{url}
+\usepackage{hyperref}
+
 \usepackage{color}
 \usepackage{listings}
 \lstset{ %
@@ -290,10 +293,11 @@ De la sorte, on a contraint le programme à afficher I'm the master seulement un
 des threads aura affiché son Hello.
 
 La politique de partage de ressources entre les threads est également un élément clé de la programmation
-concurrente. Conséquemment, OpenMP offre la possibilité de déclarer une variable ``shared'' ou ``private''.
+concurrente. Conséquemment, OpenMP offre la possibilité de déclarer une variable ``shared'' ou 
+``private''. 
 Dans le premier cas, elle sera visible et modifiable par tous les threads, et son accès nécessitera sans
 doute une synchronisation. Dans le second cas, chaque thread aura une copie de la variable invisible aux 
-autres. Il existe des variations que nous n'allons pas discuter.
+autres \cite{ompmem}. Il existe des variations que nous n'allons pas discuter.
 \\Il n'est pas utile de rentrer ici plus longuement dans les détails. Ajoutons simplement que la
 norme a bien entendu énormément évolué au cours du temps pour répondre à des besoins de plus en plus
 variés. Ainsi, il est désormais possible de réaliser des parallélisations vectorielles. Des possibilités
@@ -841,7 +845,7 @@ envisager. La question de l'intérêt proprement dit des améliorations que l'on
 aussi, dans la mesure où le cas paraissait trop particulier et sans doute trop rare pour pouvoir justifier
 les efforts d'implémentation d'une solution. De plus, les résultats des tests ne semblaient pas aller dans 
 un sens justifiant la poursuite des travaux.
-\\Après discussion avec mes tuteurs, nous avons donc décider de recadrer le travail dans une direction 
+\\Après discussion avec mes tuteurs, nous avons donc décidé de recadrer le travail dans une direction 
 sensiblement différente. Fabrice Rastello, le chef de l'équipe, s'intéressait aux phénomènes de caches
 qui pouvaient se produire lorsqu'un cache était partagé entre plusieurs threads. Il s'agissait d'abord
 de réaliser un benchmark, en se basant sur les travaux déjà réalisés, permettant d'évaluer les vitesses
@@ -850,6 +854,153 @@ variable (notamment, plus ou moins grande que le cache). Dans un deuxième temps
 construire un modèle permettant d'estimer a priori les performances atteignables dans différentes 
 situations de partage. C'est donc là-dessus que j'ai recentré mon travail pour le reste du stage.
 
+
+\chapter{Évaluation de la bande-passante d'une architecture}
+
+On a donc cherché à estimer par un benchmark la bande-passante d'une architecture, ou encore la vitesse
+maximale à laquelle cette architecture est capable de rapatrier des données depuis la mémoire, quel que 
+soit ici le niveau de mémoire auquel on se réfère, et qui peut donc être un des niveaux de cache ou
+encore la mémoire principale. En plus de cela, on cherche également à voir comment peut se comporter
+cette vitesse selon qu'un ou plusieurs threads cherchent ensemble à accéder à la mémoire. Nous verrons
+que des effets étonnants peuvent apparaître. Commençons d'abord par réétablir comment se construit
+la hierarchie mémoire d'une architecture moderne.
+
+\section{La hierarchie mémoire}
+
+Le fonctionnement d'un ordinateur moderne est basé sur ce qu'on appelle le modèle de Von Neumann\cite{vonNeumann}.
+Dans ce modèke, un ordinateur est divisé en les quatre éléments suivants :
+\begin{easylist}[checklist]
+   & Entrée (Input) 
+   & Unité de contrôle
+   & Unité arithmétique/logique
+   & Sortie (output)
+  \end{easylist}
+  Ces éléments sont récapitulés dans le schéma \ref{fig:neumann}
+\begin{figure}
+  \includegraphics[scale=1]{JVN.jpg}
+  \caption{schéma d'une archtecture de Von Neumann}
+  \label{fig:neumann}
+\end{figure}
+
+Les noms des éléments sont assez explicites. Les entrées et sorties permettent à la machine d'interagir
+avec l'extérieur : l'entrée peut être, par exemple, les signaux envoyés par un clavier ou une souris,
+la sortie ceux envoyés à un écran ou une imprimante. L'unité arithmétique réalise les opérations logiques
+ou arithmétiques proprement dites, comme des additions, des multiplications, des et/ou logiques. 
+La mémoire sert à stocker les données et les instructions du programme. Enfin, l'unité de contrôle
+s'occupe de la coordination, du séquencage des instructions et de la redirection des données et des
+résultats des opérations de l'unité logique. 
+\\L'opposition mémoire/unité de calcul est ici posée plus clairement. Comme on l'a déjà dit auparavant,
+l'une des problématiques qui a motivé le plus de recherches et d'innovations sur les architectures dans
+les dernières années est le fait que l'unité logique est aujourd'hui beaucoup plus rapide que la mémoire,
+le fameux memory gap qu'on a déjà évoqué. Une des solutions déjà ancienne qui permet de pallier au souci
+est que la mémoire n'est pas constituée d'un unique bloc, mais d'une stratification de niveaux croissants
+en taille et en temps d'accès. C'est ce qu'on appelle la hierarchie mémoire. La mémoire la plus petite est
+constitué des registres, extrêment proche physiquement des unités arithmétiques et contenant typiquement
+entre quatre et jusqu'à 32  ou même 64 octets. À l'autre extrémité du spectre, on trouve la RAM 
+(random-access Memory), usuellement de plusieurs Gibioctets. Dans la mesure où leur fonction habituelle 
+n'est pas de stocker les données d'un programme, on ne compte généralement pas les périphériques de 
+stockage type disque dur comme faisant partie de la mémoire au sens du modèle de Von Neumann, quand 
+bien même cette configuration peut se produire en cas de défaut de page - le mécanisme qui permet 
+d'étendre la mémoire principale en utilisant la mémoire de masse. Entre la mémoire et les registres 
+se trouvent généralement des mémoires intermédiaires appelés caches. Ces caches peuvent être de nombres 
+et de tailles variables. Un exemple, ainsi que des ordres de grandeur, sont présentés dans le schéma 
+\ref{fig:memhier}.
+\begin{figure}
+	\includegraphics[scale=1]{hierar.jpg}
+  \caption{un exemple schématique de hierarchie mémoire}
+  \label{fig:memhier}
+\end{figure}
+\\L'intérêt de cette hierarchie est assez naturel : dans la mesure où il devenait impossible d'avoir
+à la fois des mémoires assez larges pour les besoins des programmes modernes et suffisamment
+rapides pour ne pas représenter un goulot d'étranglement, on a cherché un compromis en ajoutant
+des mémoires intermédiaires plus petites mais plus rapides, en espérant faire en sorte que les données
+les plus accédées tiendront dans un des caches. À noter que les stratégies de remplissage du cache ont
+une importance cruciale, et notamment les politiques de remplacement : quelle donnée doit être 
+sacrifiée et amenée vers un niveau inférieur de la hierarchie lorsqu'une autre donnée doit y être
+stockée ? On aura l'occasion d'en discuter plus longuement dans la troisième partie de ce rapport.
+\\Ce que nous voulons réaliser ici, c'est un benchmark qui mesure le temps d'accès aux différents 
+niveaux de la mémoire, en se débarrassant autant que possible de tous les bruits pouvant perturber
+la mesure.
+
+\section{Implémentation}
+
+Je me suis basé, pour mon implémentation, sur certains des travaux déjà réalisés par l'équipe.
+Ainsi, un benchmark permettant d'estimer différents paramètres de ce type avait été codé par
+mon tuteur. Il existait aussi d'autres benchmarks disponibles en ligne. J'ai notamment utilisé
+un benchmark en source libre appelé STREAM.
+\\Une version naïve d'un benchmark tel qu'on l'a décrit serait quelque chose de ce genre :
+
+\begin{lstlisting}
+void load(float * t, size_t siz)
+{
+    float res;
+    for (int i = 0 ; i < size; i++)
+        res = t[i]; 
+}
+\end{lstlisting}
+
+Il suffirait alors de mesurer le temps d'exécution de cette fonction, puis de diviser la quantité
+sizeof(float) (taille d'une donnée de type flottant) par le temps obtenu. Cette approche souffre
+en fait de plusieurs problèmes.
+\\Le souci majeur ici vient de l'optimisation du compilateur. Tout compilateur moderne, à commencer
+par GCC, analyse le code compilé pour repérer d'éventuelles optimisations, comme par exemple du 
+code mort à éliminer ou encore des variables intermédiaires à supprimer. Le gain d'une optimisation
+est difficile à estimer dans la mesure où il dépend du programme mais le temps d'exécution peut
+potentiellement changer d'un ordre de grandeur. le problème dans notre exemple est que notre variable
+est inutilisé, dans le sens où son élimination ne changera pas la sémantique du programme. On pourrait
+simplement ajouter un print:
+\begin{lstlisting}
+void load(float * t, size_t siz)
+{
+    float res;
+    for (int i = 0 ; i < size; i++)
+        res = t[i]; 
+    printf(``res = %d\n''); 
+}
+\end{lstlisting}
+
+Mais même alors, tous les loads sont considérés comme inutiles, sauf un. Chacune des lectures réalisées
+sur le tableau sera éliminée, à l'exception de la dernière. On aura donc pas le comportement attendu.
+La première réaction que l'on pourrait avoir serait de désactiver l'optimisation. On aurait ainsi 
+garanti que toutes les lectures seraient effectivement effectuées. Le souci que l'on aura est que dans
+ce cas, des accès superflus à la mémoire seraient également réalisés, menant à un overhead considérable.
+En l'occurrence, dans notre code, on ferait de la sorte chacune des lectures, mais on réaliserait 
+également un accès en écriture sur la variable res à chaque itération, alors que cette variable pourrait
+parfaitement être maintenue dans un registre. On ferait donc à chaque itération une lecture et une
+écriture, alors qu'on voulait originalement ne réaliser qu'une lecture. Nous devons donc maintenir
+une optimisation. Les développeurs de stream ne disent d'ailleurs pas autre chose :
+
+\begin{quote}
+ 	3) Compile the code with optimization.  Many compilers generate
+        unreasonably bad code before the optimizer tightens things up.  
+      If the results are unreasonably good, on the other hand, the
+        optimizer might be too smart for me!
+\end{quote}
+
+En clair : utilisez les options d'optimisation. Si les résultats sont déraisonnables, c'est que le 
+compilateur a éliminé plus de code que prévu. STREAM ne fait d'ailleurs pas de benchmark sur la seule
+opération de lecture : il fait des copies de tableaux ou des opérations mathématiques comme des additions
+ou des multiplications.
+\\Il existe plusieurs réponses possibles à cette question. La première, celle utilisée dans le benchmark
+développé par mon équipe, est d'utiliser les valeurs lues dans un calcul quelconque, par exemple une 
+réduction.
+\begin{lstlisting}
+void load(float * t, size_t siz)
+{
+    float res;
+    for (int i = 0 ; i < size; i++)
+        res += t[i]; 
+    printf(``res = %d\n''); 
+}
+\end{lstlisting}
+Dans cette version, on calcule la somme de tous les éléments du tableau qui est lu. Ainsi le programme
+ne contient plus de code mort et l'on est sûr que chacune des lectures est réalisée. Cependant, un autre
+problème se pose alors : chaque itération dépend de la complétion de l'itération précédente. Cela pose
+un problème car les architectures modernes sont capables d'enchaîner les lectures. Une série de lectures
+en mémoire est en fait généralement moins long que le temps de lire une donnée multiplié par le nombre
+de données. C'est la différence entre les notions de latence et de débit (latency et througput en 
+anglais). Dans la mesure où chaque itération dépend de la précédente, on sera dans notre exemple
+limité en latence et non en débit.
 \bibliographystyle{plain}
 \bibliography{report}
 \end{document}
