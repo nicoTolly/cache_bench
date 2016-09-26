@@ -11,6 +11,8 @@
 \usepackage{url}
 \usepackage{hyperref}
 
+\usepackage{mathtools}
+
 \usepackage{color}
 \usepackage{listings}
 \lstset{ %
@@ -1104,7 +1106,7 @@ régulièrement des erreurs au moment de l'exécution que je n'ai pas réellemen
 cette configuration, les mallocs échouaient dès que la taille allouée devenait trop grande. Il a donc
 fallu réaliser l'allocation et l'initialisation dans la partie séquentielle. Pour cela, on récupére
 le nombre de threads (qu'on indiquait en lançant le programme avec la variable 
-OMP\_NUM\_THREADS=<nb threads>) puis on alloue un tableau de taille (taille de tableau par thread *
+OMP\_NUM\_THREADS\=nb thread>) puis on alloue un tableau de taille (taille de tableau par thread *
 nombre de threads) de la manière suivante : 
 \begin{lstlisting}
 #pragma omp parallel
@@ -1226,10 +1228,29 @@ cat threadsizes.txt | ./load
 
 De cette manière, on a un programme qui permet d'obtenir les débits individuels de chacun des threads 
 ainsi que le débit global dans le thread principal.
-\\Quelques problèmes techniques se sont posés. Ainsi, le programme se terminait de temps à autre sur une
-erreur de segmentation. Il m'a fallu un peu de recherche pour me rendre compte que l'instruction
-de load que j'utilisais réclamait un pointeur aligné sur 32 octets. Il est donc nécessaire d'aligner
-notre tableau, ce que je fais grâce à la fonction suivante : 
+\\Pour le cas des architectures NUMA, on voulait disposer d'une option du programme pour différencier
+un nombre donné de threads et les exiler sur un autre noeud. J'ai procédé de la manière suivante :
+en premier lieu, j'ai ajouté deux options à mon code, une option ``-slow'' qui permet de préciser le
+nombre de threads qu'on veut ostraciser (slow car ces threads atteindront vraisemblablement une vitesse
+moins importante) et l'option ``-places'' qui permet de placer les threads slow sur un noeud différent
+des threads slow. Au début du programme, le thread principal est placé sur le thread 0. Les autres 
+threads sont ensuite créés, puis placés sur les coeurs appropriés. De la sorte, si le fichier 
+threadsizes.txt est comme suit : 
+\begin{lstlisting}[language=bash]
+1000000
+1000000
+1000000
+2000000
+\end{lstlisting}
+
+alors la commande suivante crée trois threads normaux chargeant chacun un tableau de 1000000 flottants
+double précision et un thread ostracisé chargeant un tableau de 2000000 flottants double précision.
+\begin{lstlisting}[language=bash]
+cat threadsizes | ./load -slow=1 -places=spread
+\end{lstlisting}
+Par ailleurs, quelques problèmes techniques se sont posés. Ainsi, le programme se terminait de temps à 
+autre sur une erreur de segmentation. Il m'a fallu un peu de recherche pour me rendre compte que 
+l'instruction de load que j'utilisais réclamait un pointeur aligné sur 32 octets. Il est donc nécessaire d'aligner notre tableau, ce que je fais grâce à la fonction suivante : 
 \begin{lstlisting}
 //takes a pointer and returns it
 //rounded up on upper n bound
@@ -1240,6 +1261,81 @@ char * align_ptr(char * t, intptr_t n)
 	return (char *)ptr;
 }
 \end{lstlisting}
+Par ailleurs, sur un plan plus pratique, la question du nombre d'itérations à exécuter s'est posée. Ce 
+nombre était au départ statique, mais cela avait pour conséquence que le temps d'exécution du programme
+variaient avec la taille du donnée, au point d'ailleurs qu'il devenait beaucoup trop long pour des 
+données trop grande, par exemple pour plusieurs méga ou même gigaoctets. L'autre conséquence est 
+que chaque thread aura un temps d'exécution différent, ce qui fausse la donne par rapport aux
+phénomènes que l'on veut observer. Pour améliorer mon programme sur la question, j'ai choisi 
+de calculer un nombre d'itérations dépendant de la taille du tableau donné en entrée. Le 
+calcul est assez simple : 
+\begin{lstlisting}
+long get_nb_iter(long size)
+{
+	long k = 64;
+	if(size < 64)
+	{
+		cout << "array too small !!" << endl;
+		abort();
+	}
+	while(k * size * DOUBLE_PER_CYCLE < TOTAL_CYCLES )
+		k = k << 1;
+	return k;
+}
+\end{lstlisting}
+TOTAL\_CYCLES est un nombre arbitraire fixé à $2^{28}$, qui représente le nombre approximatif de cycles
+que l'on veut voir exécuté par chaque thread. DOUBLE\_PER\_CYCLE est fixé à 2 et représente une 
+approximation (evidemment fausse) du nombre de doubles pouvant être chargé en un cycle. Dans la mesure
+où ce nombre varie selon que l'on charge depuis un cache ou depuis la mémoire principale, ce calcul
+est bien entendu peu précis, mais il permet au moins de faire en sorte que toutes les exécutions aient
+le même temps de calcul en ordre de grandeur. 
+\\Le programme ayant ainsi été écrit et testé dans la mesure du possible (vérification que les éléments
+en mémoire étaient bien chargés, ou que le nombre d'itérations était bien celui attendu), il peut 
+servir de base à l'analyse des architectures à disposition, ainsi que comme vérification des futures
+prédictions. 
+
+\section{Tests et résultats}
+On a déjà évoqué la machine Idchire sur laquelle on faisait nos tests. Dans la mesure où cette machine
+a connu des problèmes de maintenance et a été à plusieurs reprises indisponibles, mais aussi parce qu'il
+était plus intéressant de disposer de plusieurs architectures, j'ai eu accès à une autre machine, gérée
+celle-ci directement par l'équipe, et dénommée Dracula. Celle-ci possède quatre coeurs sur un seul noeud,
+tout en étant d'une génération plus récente que Idchire et possédant donc quelques instructions 
+supplémentaires. Nous allons donc voir ce qu'ont donné les tests pratiqués sur ces machines et les
+conclusions qu'on a pu en tirer.
+\subsection{Tests sur la machine NUMA}
+Revenons d'abord sur le sujet qui a occupé la première partie de mon stage. Si, dans le dernier chapitre,
+je présente une version aboutie du benchmark que j'ai construit, l'ensemble des connaissances 
+nécessaire à sa réalisation, ainsi que des différents pièges et difficultés n'ont été acquises que 
+progressivement. Ainsi, les premiers tests que j'ai pu effectués l'ont été avec une version très naïve
+de ce qu'allait ensuite devenir le programme. Le benchmark tel que je l'avais écrit sur le moment 
+était notamment compilé sans optimisation, sans que je mesure l'impact qu'une telle décision pouvait
+avoir sur la performance. Le fait que les placements de threads d'OpenMP pouvait avoir une influence
+sur le comportement du programme meme après la sortie de la zone parallélisé m'échappait. Enfin, les
+accès réalisés n'étaient pas vectoriels et on peut imaginer que je n'utilisais pas toute la 
+bande-passante disponible.
+\\Tous ces paramètres ont fait que la différence entre les accès distants et locaux semblaient 
+négligeables : un accès distant ne paraissait pas prendre particulièrement plus de temps, du moins
+en lecture. Une différence plus notable semblait se faire sur des accès en écriture, mais les temps
+n'étaient pas stables non plus. Les résultats étant difficiles à interpréter, j'essayais d'en 
+chercher la cause dans diverses directions, notamment dans des effets de préfetch. Certaines 
+architectures modernes peuvent faire une supposition raisonnable sur les prochaines données qui
+seront accédées et tenter de les rapatrier en avance dans le cache. Il paraissait sur le moment
+plausible que cette stratégie puisse mitiger les écarts de performance, surtout dans la mesure où
+mes accès étaient linéaires et particulièrement prévisibles. Une politique de localité qui rapatrierait
+par avance les données consécutives à celles déjà accédées était susceptible dans mon cas de donner
+ de bons résultats. Cependant, mes recherches effectuées sur le sujet ne semblaient pas montrer
+ l'existence d'un préfetch hardware automatique très avancé en l'état actuel de la technologie.
+ Il est vrai que le secret tenu par les constructeurs comme Intel sur leurs design pouvait
+ éventuellement expliquer le peu de littérature sur le sujet.
+ \\J'ai eu l'occasion de revenir plus tard sur ces premiers résultats avec plus de recul et beaucoup
+ plus de maitrise que je n'en avais sur le moment. Avec un programme au point et bien testé, il
+ a finalement été possible de mettre en évidence des écarts de performances très notables. Les 
+ comportements ressemblent plus à ceux auxquels on pouvait s'attendre. Tant que les données chargées
+ d'une part par les threads locaux, d'autre part par les threads distants tiennent dans le cache 
+ que partagent tous les coeurs d'un meme noeud, il n'y a aucune différence de performance. Cependant,
+ dès que les données chargées ne tiennent plus dans le cache et qu'on doit donc accéder à la mémoire
+ principale, et donc à un noeud distant pour les threads ostracisés, on observe la différence de 
+ performance attendue.
 \bibliographystyle{plain} 
 \bibliography{report}
 \end{document}
