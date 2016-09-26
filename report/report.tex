@@ -504,7 +504,7 @@ n'utiliseront qu'une petite fraction de l'espace qui leur aura été attribué. 
 de pages est donc le résultat d'un compromis entre ces deux facteurs. Aujourd'hui, une page est 
 typiquement constituée de 4 Kibioctets par défaut. Cependant, la plupart des architectures propose
 la possibilité d'utiliser des pages plus grandes, parfois de plusieurs mebioctets ou même d'un ou
-plusieurs gibioctets. Cette option est désignée par le terme ``huge pages''.
+plusieurs gibioctets. Cette option est désignée par le terme ``huge pages''\cite{hugePagesDoc}.
 \\Revenons aux architectures NUMA. Dans une architecture uniforme classique, l'emplacement d'une
 page en mémoire ne fait pas de différence dans la mesure où l'accès à la mémoire est partout identique.
 Comme on l'a déjà expliqué, il n'en va pas ainsi pour une architecture NUMA où l'accès local est plus
@@ -747,12 +747,12 @@ d'environnement CPU\_PROC\_BIND à true avant de lancer un programme OpenMP, on 
 garantir qu'un thread ne sera pas déplacé tout au long de l'exécution du programme. On met ainsi une
 sécurité quant à la possibilité qu'un thread puisse être déplacé et donc avoir à accéder à des données
 qu'il avait allouées sur un autre noeud. Il y a même mieux : la spécification OpenMP définit une autre
-variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur des coeurs précis. Ainsi,
-OMP\_PLACES=\{0;4\} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
+variable d'environnement, OMP\_PLACES, qui permet de fixer les threads sur des coeurs précis\cite{ompaff}. 
+Ainsi, OMP\_PLACES=\{0;4\} ./example forcera le programme OpenMP example à s'exécuter exclusivement sur les
 coeurs 0 à 4 (exclu). Cette option, déjà présente sur les supports d'exécution de GCC et d'Intel,
 est devenu une part intégrante de la spécification depuis la version 4.0.  On voit ainsi qu'un utilisateur
 avisé a la possibilité de guider le runtime pour obtenir un comportement plus optimal que ce que serait
-le comportement par défaut. 
+le comportement par défaut\cite{threadaff}. 
 \\Ce n'est cependant pas tout à fait le seul problème. Il faut maintenant parler de la manière dont
 OpenMP répartit les tâches sur les différents coeurs. À partir de maintenant, sauf indication 
 contraire, le comportement que je vais expliquer est valable pour le runtime développé par Intel, quand
@@ -906,7 +906,8 @@ se trouvent généralement des mémoires intermédiaires appelés caches. Ces ca
 et de tailles variables. Un exemple, ainsi que des ordres de grandeur, sont présentés dans le schéma 
 \ref{fig:memhier}.
 \begin{figure}
-	\includegraphics[scale=1]{hierar.jpg}
+  \centering
+	\includegraphics[scale=0.5]{hierar.jpg}
   \caption{un exemple schématique de hierarchie mémoire}
   \label{fig:memhier}
 \end{figure}
@@ -923,12 +924,15 @@ niveaux de la mémoire, en se débarrassant autant que possible de tous les brui
 la mesure.
 
 \section{Implémentation}
-
 Je me suis basé, pour mon implémentation, sur certains des travaux déjà réalisés par l'équipe.
 Ainsi, un benchmark permettant d'estimer différents paramètres de ce type avait été codé par
 mon tuteur. Il existait aussi d'autres benchmarks disponibles en ligne. J'ai notamment utilisé
-un benchmark en source libre appelé STREAM.
-\\Une version naïve d'un benchmark tel qu'on l'a décrit serait quelque chose de ce genre :
+un benchmark en source libre appelé STREAM. Nous allons voir d'abord le travail et les difficultés
+rencontrées pour réaliser le coeur de travail, à savoir le chargement des données, puis le travail 
+réalisé autour pour mesurer le temps et répartir le travail sur plusieurs threads.
+\subsection{Le coeur du calcul}
+
+Une version naïve d'un benchmark tel qu'on l'a décrit serait quelque chose de ce genre :
 
 \begin{lstlisting}
 void load(float * t, size_t siz)
@@ -939,9 +943,9 @@ void load(float * t, size_t siz)
 }
 \end{lstlisting}
 
-Il suffirait alors de mesurer le temps d'exécution de cette fonction, puis de diviser la quantité
-sizeof(float) (taille d'une donnée de type flottant) par le temps obtenu. Cette approche souffre
-en fait de plusieurs problèmes.
+Il suffirait alors de mesurer le temps d'exécution de cette fonction, puis de diviser le nombre d'octets
+chargés (sizeof(float) * nombre d'itérations) par le temps obtenu.  Cette approche souffre en fait de 
+plusieurs problèmes.
 \\Le souci majeur ici vient de l'optimisation du compilateur. Tout compilateur moderne, à commencer
 par GCC, analyse le code compilé pour repérer d'éventuelles optimisations, comme par exemple du 
 code mort à éliminer ou encore des variables intermédiaires à supprimer. Le gain d'une optimisation
@@ -987,20 +991,255 @@ réduction.
 \begin{lstlisting}
 void load(float * t, size_t siz)
 {
-    float res;
+    float red;
     for (int i = 0 ; i < size; i++)
-        res += t[i]; 
-    printf(``res = %d\n''); 
+        red += t[i]; 
+    printf(``red = %d\n'', red); 
 }
 \end{lstlisting}
 Dans cette version, on calcule la somme de tous les éléments du tableau qui est lu. Ainsi le programme
 ne contient plus de code mort et l'on est sûr que chacune des lectures est réalisée. Cependant, un autre
-problème se pose alors : chaque itération dépend de la complétion de l'itération précédente. Cela pose
-un problème car les architectures modernes sont capables d'enchaîner les lectures. Une série de lectures
-en mémoire est en fait généralement moins long que le temps de lire une donnée multiplié par le nombre
+problème se pose alors : chaque itération dépend de la complétion de l'itération précédente. C'est un souci
+car les architectures modernes sont capables d'enchaîner les lectures. Une série de lectures
+en mémoire est en fait généralement moins longue que le temps de lire une donnée multiplié par le nombre
 de données. C'est la différence entre les notions de latence et de débit (latency et througput en 
 anglais). Dans la mesure où chaque itération dépend de la précédente, on sera dans notre exemple
 limité en latence et non en débit.
-\bibliographystyle{plain}
+\\La solution est alors de dérouler la boucle et d'opérer plusieurs réductions successives. De la
+sorte, on laisse le temps au programme de rapatrier plusieurs données de suite et on ne l'oblige pas
+à attendre le chargement complet de la valeur suivante. Par exemple, si l'on a une latence de 5 cycles
+et un débit de 2 cycles (autrement dit : charger une donnée isolée prendra 5 cycles, mais charger un grand
+nombres de données seulement 2 cycles en moyenne, car le système utilise un système analogue au 
+pipelining), et qu'on réalise une opération sur les données qui prend 6 cycles - les valeurs utilisées
+ici sont arbitraires -, alors il faut laisser 11 cycles entre deux utilisations successives d'une 
+variable de réduction. On utilisera donc 6 réductions successives, comme dans le code suivant :
+\begin{lstlisting}
+void load(float * t, size_t siz)
+{
+    float red;
+    float red1;
+    float red2;
+    float red3;
+    float red4;
+    float red5;
+    for (int i = 0 ; i < size; i+=6)
+    {
+        red += t[i]; 
+        red1 += t[i+1]; 
+        red2 += t[i+2]; 
+        red3 += t[i+3]; 
+        red4 += t[i+4]; 
+        red5 += t[i+6]; 
+      }
+    printf(``red = %d\n'', red + red1 + red2 + red3 + red4 + red5); 
+}
+\end{lstlisting}
+Cependant ce code présente encore des inconvénients. Le plus notable est que la latence et le débit 
+sont tous deux fortement dépendants de l'architecture, mais surtout de l'endroit où réside les données
+à un certain moment. On met plus longtemps, par définition, à accéder à une donnée résidant en mémoire
+principale qu'à une donnée résidant dans un des niveaux de cache. De ce fait, on ne peut savoir avec
+certitude quel sera la latence d'un chargement. Ceci nous oblige, de manière générale, à mettre beaucoup
+de réductions, potentiellement plus que nécessaire. Cependant, insérer trop de réduction dans le code
+peut faire apparaître un autre goulot d'étranglement : il peut désormais y avoir conflit pour l'accès 
+aux ressources de calculs. Imaginons par exemple que dans l'exemple ci-dessus, le coeur sur 
+lequel le code est exécuté ne dispose que de trois ressources d'addition de flottants. Dès lors, dans
+la mesure où on essaie de faire six réductions simultanément, il y aura conflit sur chacun des éléments
+de calcul et on sera potentiellement limité par le débit de ces instructions. On peut mitiger ce 
+problème en utilisant plusieurs types d'opérations arithmétiques différents (par exemple des additions
+et des multiplications) de sorte à maximiser le nombre d'éléments de micro-architectures utilisés.
+Cependant, ceci suppose encore une connaissance pointue de l'architecture utilisée et limite 
+fortement la portabilité du code. De plus, on n'est jamais complètement sûr d'être limité par
+la bande-passante mémoire et pas par un autre paramètre.
+\\Il existe une autre solution un peu plus directe. L'optimisation du compilateur est paramétrable,
+il existe des moyens de l'éliminer partiellement ou complètement. GCC permet par exemple de désactiver
+l'optimisation pour une fonction particulière. Cependant, la granularité de cette opération est encore
+un peu forte pour nos besoins : on voudrait éviter absolument tous les accès mémoires superflus. Par 
+exemple, même dans une simple boucle : 
+\begin{lstlisting}
+    for (int i = 0 ; i < size; i++)
+        foo();
+\end{lstlisting}
+la seule incrémentation de la variable d'itération i provoque potentiellement un accès en écriture
+à chaque itération de la boucle, alors que cette variable pourrait être facilement maintenue
+dans un registre. Une optimisation aussi simple pourrait être effectuée même au niveau
+0 du compilateur (elle l'est d'ailleurs dans l'exemple basique que j'ai rapidement compilé), 
+mais on ne peut le vérifier autrement qu'en lisant systématiquement le code assembleur généré. On
+est donc contraint, pour être certain que notre programme a bien le comportement désiré, d'écrire une
+portion du code directement en assembleur, et de désactiver l'optimisation pour cette portion-là. On
+limite ici la portabilité de deux façons : d'abord au niveau de l'architecture, puisqu'on se limite ainsi
+par le jeu d'instructions qu'on va utiliser, ensuite au niveau du compilateur, puisque les options 
+de désactivation des optimisations lui sont spécifiques. On se trouve donc limité, dans mon cas,
+à écrire un code qui devra être compilé sur gcc et exécuté sur une architecture Intel x86-64 
+(l'architecture la plus courante, et celle utilisée sur les machines sur lesquelles je faisais mes tests).
+\\Cette option est celle qui a été choisie par un autre benchmark dénommé Bandwidth\cite{bandwidth} que 
+j'ai découvert plus tard. Dans ce benchmark, les portions écrites en assembleur ont été rassemblées dans
+des fichiers séparés et compilés à part avec le programme nasm. J'ai choisi pour ma part d'utiliser 
+une option de gcc qui permet d'insérer directement de l'assembleur dans le code C. Ainsi, on évite
+de rajouter une dépendance à nasm au benchmark (nasm n'était d'ailleurs pas présent sur Idchire).
+\\Reste encore une question. Comme on cherche ici à saturer la bande-passante mémoire, il faudrait
+pouvoir assurer qu'on charge bien au maximum les capacités du bus. Pour cela, il vaut mieux choisir
+l'instruction susceptible de rapatrier le plus d'octets possibles en un seul cycle. Pour cela, on va 
+utiliser non pas des instructions simples mais des instructions vectorielles. Les architectures modernes
+disposent d'instructions spécifiques en mesure de travailler sur un vecteur de données et non pas sur
+une donnée à la fois. Ainsi, la famille d'instructions AVX et AVX2 d'Intel permet de réaliser des 
+opérations sur des vecteurs de 128, 256 ou même 512 bits pour les plus récentes. Nous utiliserons
+ici des vecteurs de 256 bits. Ci-dessous se trouve le code final. L'instruction clé est vmovpapd, pour
+``vectorial move double floats''
+%TODO: insert codeasm.txt
+Cette fonction prend en paramètre un tableau de flottant (plus précisément un pointeur), la taille de 
+ce tableau et un nombre d'itérations désiré. Elle va ensuite lire le tableau linéairement autant de fois
+qu'on l'aura demandé avec le deuxième paramètre.
+
+\subsection{Autres points d'implémentation}
+Nous disposons donc maintenant du coeur de travail du programme. Reste maintenant à faire tourner
+ce coeur de travail et à récupérer les informations qui nous intéresse. Rappelons que l'objectif initial
+de ce benchmark (et ce qui le différencie par rapport aux autres déjà évoqués) est qu'il doit pouvoir
+tourner dans un contexte multi-threadé, avec un nombre de threads de préférences défini par l'utilisateur
+et chargeant chacun un nombre variable de données. 
+\\Il faut donc choisir une manière de créer dynamiquement le nombre demandé de threads et de leur donner
+un tableau à charger. OpenMP était au départ un choix assez naturel. Il fallait trouver une manière
+assez simple d'allouer des données de taille variable et de différencier le travail selon les threads.
+J'ai essayé tout d'abord de réaliser l'allocation au sein de la section parallélisée, mais on rencontrait
+régulièrement des erreurs au moment de l'exécution que je n'ai pas réellement réussi à expliquer. Dans
+cette configuration, les mallocs échouaient dès que la taille allouée devenait trop grande. Il a donc
+fallu réaliser l'allocation et l'initialisation dans la partie séquentielle. Pour cela, on récupére
+le nombre de threads (qu'on indiquait en lançant le programme avec la variable 
+OMP\_NUM\_THREADS=<nb threads>) puis on alloue un tableau de taille (taille de tableau par thread *
+nombre de threads) de la manière suivante : 
+\begin{lstlisting}
+#pragma omp parallel
+	{
+		nTh = omp_get_num_threads();
+	}
+	double arr = malloc(sizeof(double) * (sizeTab * nTh ) );
+	for(int i = 0; i < nTh; i++)
+	{
+		for (int j = 0; j < sizeTab; j++)
+			arr[i*sizeTab+j]= 3.0;
+	}
+\end{lstlisting}
+On a pas encore distingué les tailles des tableaux ici. Ensuite, chaque thread accédait à sa portion
+du tableau qui est déterminée selon son identifiant de thread, qu'on obtient grâce à la fonction
+omp\_get\_thread\_num.
+\begin{lstlisting}
+#pragma omp parallel shared(arr)
+		{
+			int i = omp_get_thread_num();
+			//load data from a section of sizeTab doubles of arr, do it K times
+			load_asm(arr+i*sizeTab, sizeTab, K);
+
+		}
+\end{lstlisting}
+De la sorte, chaque thread accède à une seule portion du tableau. K et sizeTab sont pour le moment fixé.
+Reste ensuite simplement à mesurer le temps d'exécution de la fonction load\_asm. Pour cela, on utilise
+une fonction mysecond basée sur l'appel clock\_gettime qui renvoie l'heure en seconde. Afin d'obtenir
+un résultat plus pertinent, on réalise l'opération un certain nombre de fois (NTIMES).
+\begin{lstlisting}
+	for (k=0; k<NTIMES; k++)
+	{
+		times[k] = mysecond();
+#pragma omp parallel shared( arr , timesPerTh )
+		{
+			int i = omp_get_thread_num();
+			//load data from a section of N doubles of arr, do it K times
+			load_asm(arr+i*sizeTab, sizeTab, K);
+		}
+		times[k] = mysecond() - times[k];
+	}
+\end{lstlisting}
+On peut ensuite récupérer le temps minimum mesuré entre toutes ces itérations pour en déduire un débit
+global. 
+\\Ce n'est cependant pas tout à fait ce que l'on voulait faire au début, puisque l'on cherchait à 
+avoir des threads chargeant des données de tailles différentes. On aimerait aussi pouvoir faire en sorte
+qu'un thread chargeant tel tableau se trouve sur un coeur déterminé, de sorte qu'on puisse séparer les
+travaux sur NUMA. Ici, OpenMP pose un problème. En effet, comme on l'a déjà évoqué, OpenMP est en mesure
+de fixer des threads sur certains coeurs, mais pas de garantir qu'un travail donné pourra être réalisé
+sur un coeur particulier. Comme on l'a vu dans la partie OpenMP, le travail est en effet réparti de 
+manière aléatoire entre les threads. Si l'on veut fixer convenablement les threads au bon emplacement,
+on se voit obligé de travailler à un plus bas niveau. D'autre part, le travail que réalise OpenMP au 
+niveau du placement des threads est assez opaque et interagit de manière floue avec le reste du programme. 
+Entre autres, il n'est pas évident de savoir ce qu'il adviendra d'un thread fixé préalablement sur 
+un coeur qui entrerait dans une portion de code parallélisé avec OpenMP : sera-t-il ou non replacé si 
+on a donné des instructions à OpenMP ? Travailler à un plus bas niveau permet d'avoir un meilleur
+contrôle sur ces questions, même si cela demande plus de travail. 
+\\Je me suis donc remis à utiliser la bibliothèque pthread, celle sur laquelle est basé le code 
+d'OpenMP. La fonction pthread\_create prend en argument, entre autres choses, une fonction 
+handler (qui contient le code que le thread va exécuter) ainsi qu'un pointeur générique permettant 
+de passer des arguments. Voici la structure utilisée pour passer des arguments : 
+\begin{lstlisting}
+//arguments passed
+//to thread handler
+typedef struct 
+{
+	double *t;
+	double * time;
+	pthread_barrier_t * bar;
+	long size;
+	long niter;
+	unsigned long *cycle;
+} args_t;
+\end{lstlisting}
+Les pointeurs time et cycle servent à renvoyer les valeurs de temps d'exécution en secondes et en 
+nombre de cycles au thread principal. La barrière permet d'attendre que le thread principal ait déplacé
+chacun des threads vers leur destination avant de commencer le travail. Voici maintenant le code du 
+handler proprement dit : 
+\begin{lstlisting}
+void * handler(void * arg)
+{
+	args_t * args = (args_t *) arg;
+	//size of data that are to be loaded 
+	//by this thread
+	double ld = sizeof(double) * args->size * args->niter;
+	double time;
+	unsigned long cyc; 
+	int cpu;
+
+
+	// barrier (waiting for everyone to be pinned)
+	pthread_barrier_wait(args->bar);
+
+	cpu =  sched_getcpu();
+
+
+	cyc = get_cycles();
+	time = mysecond();
+	load_asm(args->t, args->size, args->niter);
+	time = mysecond() - time;
+	cyc = get_cycles() - cyc;
+	*(args->time) = time;
+	*(args->cycle) = cyc;
+	printf("Fast thread has taken %11.8f s to execute on cpu %d, data : %ld bytes loaded %ld times\n \
+Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter, siz_d(ld / time), units_d(ld / time));
+
+	return NULL;
+}
+\end{lstlisting}
+On récupère et affiche également le numéro du coeur sur lequel le thread s'est exécuté.
+\\Il suffit désormais de récupérer les tailles des tableaux qu'on veut charger et de les passer en 
+paramètres dans une structure. Pour cela, on se contente de les récupérer par la sortie standard. 
+Ceci permet un usage plus commode. On peut écrire les tailles des tableaux désirées dans un fichier 
+et le passer par le biais d'un pipe au programme, comme ceci : 
+
+\begin{lstlisting}[language=bash]
+cat threadsizes.txt | ./load 
+\end{lstlisting}
+
+De cette manière, on a un programme qui permet d'obtenir les débits individuels de chacun des threads 
+ainsi que le débit global dans le thread principal.
+\\Quelques problèmes techniques se sont posés. Ainsi, le programme se terminait de temps à autre sur une
+erreur de segmentation. Il m'a fallu un peu de recherche pour me rendre compte que l'instruction
+de load que j'utilisais réclamait un pointeur aligné sur 32 octets. Il est donc nécessaire d'aligner
+notre tableau, ce que je fais grâce à la fonction suivante : 
+\begin{lstlisting}
+//takes a pointer and returns it
+//rounded up on upper n bound
+char * align_ptr(char * t, intptr_t n)
+{
+	intptr_t ptr;
+	ptr = (intptr_t)(t + n) & ~(n - 1);
+	return (char *)ptr;
+}
+\end{lstlisting}
+\bibliographystyle{plain} 
 \bibliography{report}
 \end{document}

@@ -11,6 +11,7 @@ all: $(BIN)
 $(BIN): $(SRC)
 	pdflatex -output-directory=$(BIN_DIR) $< && bibtex $(BIN_DIR)/report && pdflatex -output-directory=$(BIN_DIR) $< 
 
+
 $(ROOT)/report.bib:
 	bibtex $(BIN_DIR)/$< 
 

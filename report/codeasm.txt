@@ -1,0 +1,54 @@
+\begin{lstlisting}
+void load_asm(double const * t, intptr_t n, intptr_t k) 
+{
+	assert(n%4 == 0);
+	__m256d ldvec= {0,0,0,0};
+	intptr_t nbvloads= 0;
+	asm volatile (
+			//initialize load counter
+			//"movq $0, %%rcx;"
+			//"movq %%rcx, %1;"
+
+
+			//initialize outer loop counter
+			"movq $0, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jge 3f;"
+			
+			"4:;"
+
+			//initialize loop counter
+			"movq $0, %%rax;"
+			"cmpq %3, %%rax;"
+			"jge 2f;"
+
+
+
+			"1:;"
+			//vload from memory
+			"vmovapd (%2, %%rax, 8), %%ymm1;"
+			//increment and compare
+			"addq $4, %%rax;"
+			"cmpq %3, %%rax;"
+			"jl 1b;"
+
+
+
+			"2:;"
+
+			//outer loop test
+			"addq $1, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jl 4b;"
+
+			"3:;"
+			//"movq %%rcx, %1;"
+
+
+			: "=m" (ldvec) , "=m" ( nbvloads )
+			:"r" ( t ), "r" ( n ), "r" ( k )
+			:"%ymm1", "%rax", "%rbx"
+		     );
+}
+
+\end{lstlisting}
