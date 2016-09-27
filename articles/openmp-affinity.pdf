@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html class="js" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="profile" href="http://gmpg.org/xfn/11">
+		<script src="openmp-affinity_files/beacon.js" async=""></script><script>(function(html){html.className = html.className.replace(/\bno-js\b/,'js')})(document.documentElement);</script>
+<title>The Design of OpenMP Thread Affinity – Parallel Programming and High Performance Computing (HPC)</title>
+		<script src="openmp-affinity_files/remote-login.php" type="text/javascript"></script>
+		<script type="text/javascript">
+		/* <![CDATA[ */
+			if ( 'function' === typeof WPRemoteLogin ) {
+				document.cookie = "wordpress_test_cookie=test; path=/";
+				if ( document.cookie.match( /(;|^)\s*wordpress_test_cookie\=/ ) ) {
+					WPRemoteLogin();
+				}
+			}
+		/* ]]> */
+		</script>
+		<link rel="alternate" type="application/rss+xml" title="Parallel Programming and High Performance Computing (HPC) » Feed" href="https://terboven.com/feed/">
+<link rel="alternate" type="application/rss+xml" title="Parallel Programming and High Performance Computing (HPC) » Comments Feed" href="https://terboven.com/comments/feed/">
+<link rel="alternate" type="application/rss+xml" title="Parallel Programming and High Performance Computing (HPC) » The Design of OpenMP Thread&nbsp;Affinity Comments Feed" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/feed/">
+	<script type="text/javascript">
+		/* <![CDATA[ */
+		function addLoadEvent(func) {
+			var oldonload = window.onload;
+			if (typeof window.onload != 'function') {
+				window.onload = func;
+			} else {
+				window.onload = function () {
+					oldonload();
+					func();
+				}
+			}
+		}
+		/* ]]> */
+	</script>
+	<link rel="stylesheet" id="all-css-0" href="openmp-affinity_files/a_003.css" type="text/css" media="all">
+<link rel="stylesheet" id="twentysixteen-fonts-css" href="openmp-affinity_files/css.css" type="text/css" media="all">
+<link rel="stylesheet" id="all-css-2" href="openmp-affinity_files/a_002.css" type="text/css" media="all">
+<!--[if lt IE 10]>
+<link rel='stylesheet' id='twentysixteen-ie-css'  href='https://s0.wp.com/wp-content/themes/pub/twentysixteen/css/ie.css?m=1448353951h&#038;ver=20151123' type='text/css' media='all' />
+<![endif]-->
+<!--[if lt IE 9]>
+<link rel='stylesheet' id='twentysixteen-ie8-css'  href='https://s0.wp.com/wp-content/themes/pub/twentysixteen/css/ie8.css?m=1448353951h&#038;ver=20151123' type='text/css' media='all' />
+<![endif]-->
+<!--[if lt IE 8]>
+<link rel='stylesheet' id='twentysixteen-ie7-css'  href='https://s0.wp.com/wp-content/themes/pub/twentysixteen/css/ie7.css?m=1448353951h&#038;ver=20151123' type='text/css' media='all' />
+<![endif]-->
+<link rel="stylesheet" id="all-css-8" href="openmp-affinity_files/a.css" type="text/css" media="all">
+<script type="text/javascript">
+/* <![CDATA[ */
+var LoggedOutFollow = {"invalid_email":"Your subscription did not succeed, please try again with a valid email address."};
+/* ]]> */
+</script>
+<script type="text/javascript" src="openmp-affinity_files/a"></script>
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://cterboven.wordpress.com/xmlrpc.php?rsd">
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="https://s1.wp.com/wp-includes/wlwmanifest.xml"> 
+<link rel="prev" title="On the future of HPC on&nbsp;Windows" href="https://terboven.com/2011/12/29/on-the-future-of-hpc-on-windows/">
+<link rel="next" title="Several Event Annoucements" href="https://terboven.com/2012/09/11/several-event-annoucements/">
+<meta name="generator" content="WordPress.com">
+<link rel="canonical" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/">
+<link rel="shortlink" href="http://wp.me/pmAAF-2FO">
+<link rel="alternate" type="application/json+oembed" href="https://public-api.wordpress.com/oembed/1.0/?format=json&amp;url=https%3A%2F%2Fterboven.com%2F2012%2F06%2F21%2Fthe-design-of-openmp-thread-affinity%2F&amp;for=wpcom-auto-discovery"><link rel="alternate" type="application/xml+oembed" href="https://public-api.wordpress.com/oembed/1.0/?format=xml&amp;url=https%3A%2F%2Fterboven.com%2F2012%2F06%2F21%2Fthe-design-of-openmp-thread-affinity%2F&amp;for=wpcom-auto-discovery">
+<!-- Jetpack Open Graph Tags -->
+<meta property="og:type" content="article">
+<meta property="og:title" content="The Design of OpenMP Thread Affinity">
+<meta property="og:url" content="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/">
+<meta property="og:description" content="Exascale machines will employ significantly more threads than today, but even on current architectures controlling thread affinity is crucial to fuel all the cores and to maintain data affinity, bu…">
+<meta property="article:published_time" content="2012-06-21T07:49:11+00:00">
+<meta property="article:modified_time" content="2012-06-21T07:49:11+00:00">
+<meta property="og:site_name" content="Parallel Programming and High Performance Computing (HPC)">
+<meta property="og:image" content="https://cterboven.files.wordpress.com/2012/06/affinity_example_nested_spread_close.png?w=300">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:site" content="@cterboven">
+<meta name="twitter:image" content="https://cterboven.files.wordpress.com/2012/06/system_topology_example.png?w=240">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:creator" content="@cterboven">
+<meta property="article:publisher" content="https://www.facebook.com/WordPresscom">
+<link rel="shortcut icon" type="image/x-icon" href="https://s2.wp.com/i/favicon.ico" sizes="16x16 24x24 32x32 48x48">
+<link rel="icon" type="image/x-icon" href="https://s2.wp.com/i/favicon.ico" sizes="16x16 24x24 32x32 48x48">
+<link rel="apple-touch-icon-precomposed" href="https://s0.wp.com/i/webclip.png">
+<link rel="openid.server" href="https://cterboven.wordpress.com/?openidserver=1">
+<link rel="openid.delegate" href="https://cterboven.wordpress.com/">
+<link rel="search" type="application/opensearchdescription+xml" href="https://terboven.com/osd.xml" title="Parallel Programming and High Performance Computing (HPC)">
+<link rel="search" type="application/opensearchdescription+xml" href="https://s1.wp.com/opensearch.xml" title="WordPress.com">
+<meta name="application-name" content="Parallel Programming and High Performance Computing (HPC)"><meta name="msapplication-window" content="width=device-width;height=device-height"><meta name="msapplication-tooltip" content="Articles, selected news and personal thoughts - by Christian Terboven."><meta name="msapplication-task" content="name=Subscribe;action-uri=https://terboven.com/feed/;icon-uri=https://s2.wp.com/i/favicon.ico"><meta name="msapplication-task" content="name=Sign up for a free blog;action-uri=http://wordpress.com/signup/;icon-uri=https://s2.wp.com/i/favicon.ico"><meta name="msapplication-task" content="name=WordPress.com Support;action-uri=http://support.wordpress.com/;icon-uri=https://s2.wp.com/i/favicon.ico"><meta name="msapplication-task" content="name=WordPress.com Forums;action-uri=http://forums.wordpress.com/;icon-uri=https://s2.wp.com/i/favicon.ico"><meta name="title" content="The Design of OpenMP Thread&nbsp;Affinity | Parallel Programming and High Performance Computing (HPC) on WordPress.com">
+<meta name="description" content="Exascale machines will employ significantly more threads than today, but even on current architectures controlling thread affinity is crucial to fuel all the cores and to maintain data affinity, but both MPI and OpenMP lack a solution to this problem - this is the first sentence of our IWOMP 2012 paper with the same title…">
+		<script type="text/javascript" src="openmp-affinity_files/amzn_ads.js"></script>
+		<script type="text/javascript">
+		try { amznads.getAds("3033"); } catch(e) { /* ignore */ }
+		</script><script type="text/javascript" src="openmp-affinity_files/bid"></script>
+		<script type="text/javascript">
+		try {
+			var a9_p = amznads.getKeys(),
+			_ipw_custom = {
+				wordAds: '0',
+				adSafe: '0',
+				domain: 'terboven.com',
+				pageURL: 'https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/'
+			};
+			if("undefined"!=typeof a9_p&&""!=a9_p&&null!==a9_p&&"[object Array]"===Object.prototype.toString.call(a9_p)){var a="",b=0,c=a9_p.length;a9_p.sort();for(var d=0;d<c;d++){a9_p[d-b]=a9_p[d-b].replace(/a1x6p/,"a160x600p");var e=a9_p[d-b].split("p");e[0]==a&&(a9_p.splice(d-b,1),b++);a=e[0]}_ipw_custom.amznPay=a9_p};document.close();
+		} catch(e) {}
+		</script>		<!-- IPONWEB header script -->
+		<script type="text/javascript">
+			window.__ATA = {
+				scriptSrc: '//s.pubmine.com/showad.js',
+				slotPrefix: 'automattic-id-',
+				initAd: function(o) {
+					var o = o || {},
+						g = window,
+						d = g.document,
+						wr = d.write,
+						id = g.__ATA.id();
+					wr.call(d, '<div id="' + id + '" data-section="' + (o.sectionId || 0) + '"' + (o.type ? ('data-type="' + o.type + '"') : '') + ' ' + (o.forcedUrl ? ('data-forcedurl="' + o.forcedUrl + '"') : '') + ' style="width:' + (o.width || 0) + 'px; height:' + (o.height || 0) + 'px;">');
+					g.__ATA.displayAd(id);
+					wr.call(d, '</div>');
+				},
+				displayAd: function(id) {
+					window.__ATA.ids = window.__ATA.ids || {};
+					window.__ATA.ids[id] = 1;
+				},
+				customParams: _ipw_custom,
+				id: function() {
+					return window.__ATA.slotPrefix + (parseInt(Math.random() * 10000, 10) + 1 + (new Date()).getMilliseconds());
+				}
+			};
+			(function(d, ata) {
+				var pr = "https:" === d.location.protocol ? "https:" : "http:",
+					src = pr + ata.scriptSrc,
+					st = "text/javascript";
+				d.write('<scr' + 'ipt type="' + st + '" src="' + src + '"><\/scr' + 'ipt>');
+			})(window.document, window.__ATA);
+		</script><script type="text/javascript" src="openmp-affinity_files/showad.js"></script>
+		<script type="text/javascript">
+		jQuery(window).ready(function () {
+			jQuery("a.wpa-about").text("About these ads");
+		});
+		</script><link rel="amphtml" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/amp/"><style type="text/css" id="syntaxhighlighteranchor"></style>
+<script type="text/javascript">
+	window.google_analytics_uacct = "UA-52447-2";
+</script>
+
+<script type="text/javascript">
+	var _gaq = _gaq || [];
+	_gaq.push(['_setAccount', 'UA-52447-2']);
+	_gaq.push(['_setDomainName', 'none']);
+	_gaq.push(['_setAllowLinker', true]);
+	_gaq.push(['_initData']);
+	_gaq.push(['_trackPageview']);
+
+	(function() {
+		var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+		ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+		(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(ga);
+	})();
+</script><script src="openmp-affinity_files/ga.js" async="" type="text/javascript"></script>
+<script src="openmp-affinity_files/a.js" async="" type="text/javascript"></script></head>
+
+<body class="single single-post postid-10280 single-format-standard custom-background mp6 customizer-styles-applied highlander-enabled highlander-light">
+<div id="page" class="site">
+	<div class="site-inner">
+		<a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+
+		<header id="masthead" class="site-header" role="banner">
+			<div class="site-header-main">
+				<div class="site-branding">
+					
+											<p class="site-title"><a href="https://terboven.com/" rel="home">Parallel Programming and High Performance Computing (HPC)</a></p>
+											<p class="site-description">Articles, selected news and personal thoughts – by Christian Terboven.</p>
+									</div><!-- .site-branding -->
+
+									<button id="menu-toggle" class="menu-toggle">Menu</button>
+
+					<div id="site-header-menu" class="site-header-menu">
+													<nav id="site-navigation" class="main-navigation" role="navigation" aria-label="Primary Menu">
+								<div class="menu-pages-menu-container"><ul id="menu-pages-menu" class="primary-menu"><li id="menu-item-10517" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-10517"><a href="https://terboven.com/">Home</a></li>
+<li id="menu-item-10518" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10518"><a href="https://terboven.com/about/">About me</a></li>
+<li id="menu-item-10519" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10519"><a href="https://terboven.com/publications/">Publications</a></li>
+<li id="menu-item-10520" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10520"><a href="https://terboven.com/talks-misc/">Talks and Misc.</a></li>
+</ul></div>							</nav><!-- .main-navigation -->
+						
+											</div><!-- .site-header-menu -->
+							</div><!-- .site-header-main -->
+
+					</header><!-- .site-header -->
+
+		<div id="content" class="site-content">
+
+<div id="primary" class="content-area">
+	<main id="main" class="site-main" role="main">
+		
+<article id="post-10280" class="post-10280 post type-post status-publish format-standard hentry category-numa category-openmp tag-binding tag-cc-numa tag-iwomp tag-openmp tag-scalemp tag-threading">
+	<header class="entry-header">
+		<h1 class="entry-title">The Design of OpenMP Thread&nbsp;Affinity</h1>	</header><!-- .entry-header -->
+
+	
+	
+	<div class="entry-content">
+		<p><em>Exascale machines will employ significantly more threads than 
+today, but even on current architectures controlling thread affinity is 
+crucial to fuel all the cores and to maintain data affinity, but both 
+MPI and OpenMP lack a solution to this problem</em> – this is the first 
+sentence of our IWOMP 2012 paper with the same title as this blog post. 
+The need for thread affinity in OpenMP has been demonstrated several 
+times at several occasions. Inside the OpenMP Language Committee we 
+formed the Affinity Subcommittee and we are working on this topic since 
+several years now. Meanwhile almost all vendors have introduced their 
+own extensions to support thread affinity, but they are all different 
+and thus offer a clearly suboptimal user experience. Furthermore, they 
+do not support nested OpenMP and in general they are static, meaning 
+that only one affinity setting can be used for the whole program. For 
+OpenMP 4.0, which is expected to be released as a draft in November 
+2012, we have a good thread affinity proposal on the table that not only
+ standardizes existing vendor extensions, but also will add additional 
+capabilities. This blog post will present this proposal along with some 
+information why things are the way the are. I welcome any comments or 
+questions via <a href="mailto:christian@terboven.com">email</a>.</p>
+<p>When we started thinking about Affinity in general, we first tried to
+ define a machine model or rather a machine abstraction and intended to 
+use that to bind threads to cores as well as to possibly define a data 
+layout. Over time I got convinced that this is not the right approach. 
+Whatever method we used to describe the machine topology, we always 
+envisioned systems that would be very complicated to be described. But 
+furthermore, describing the system could end up being a task to be 
+performed by the user, which I think is too complicated for most of 
+them. We also do not want to enforce users to think about an explicit 
+mapping of threads to cores, because for 95 % of the OpenMP programmers 
+we think this is too low level. And last but not least, when there would
+ be a new machine that could not be comfortably described by our method,
+ OpenMP develops too slowly to be extended to support that.</p>
+<p>To overcome this problem, the current proposal as developed by 
+Alexandre E. Eichenberger, myself and the members of the OpenMP Language
+ Committee Affinity Subcommittee, introduced the concepts of a <em>place</em> and a <em>place-list</em>.
+ A place is defined as a set of execution units capable of executing 
+OpenMP threads. For now you may think of a place like a set of 
+cores.&nbsp; A place-list is an ordered list of places, the <em>ordered</em>
+ attribute is important. It can be defined by either using abstract 
+names or rather constructing the places by enumerating the cores. The 
+place-list will be used together with an affinity policy to bind the 
+OpenMP threads in a team of a parallel region to the places in the list.
+ It can be specified via the new environment variable <em>OMP_PLACES</em> (the name might still change). Lets illustrate that with an example: The figure below depicts a very standard system (<em>node 0</em>) with two sockets (<em>socket 0</em> and <em>socket 1</em>), every socket having four cores (<em>core 0</em> to <em>core 3</em> on <em>socket 0</em>) and finally every core has two hardware-threads (<em>t0</em> and <em>t1</em>), i.e. every core can execute two threads simultaneously.</p>
+<figure data-shortcode="caption" id="attachment_10298" style="width: 310px" class="wp-caption aligncenter"><a href="https://cterboven.files.wordpress.com/2012/06/system_topology_example.png"><img class="size-medium wp-image-10298" title="System Topology Example: 2 sockets, 4 cores, 2 hw-threads" src="openmp-affinity_files/system_topology_example.png" alt="System Topology Example: 2 sockets, 4 cores, 2 hw-threads" height="64" width="300"></a><figcaption class="wp-caption-text">System Topology Example: 2 sockets, 4 cores, 2 hw-threads</figcaption></figure>
+<p>Lets construct a place-list consisting of eight places, every place 
+to be a physical core consisting of two hardware-threads (I often call 
+those logical-threads). All of the following methods are equivalent, but
+ we expect almost all users to use the first option:</p>
+<pre>OMP_PLACES=cores
+OMP_PLACES="(0,1),(2,3),(4,5),(6,7),(8,9),(10,11),(12,13),(14,15)"
+OMP_PLACES="(0:2):2:8"</pre>
+<p>As for now we will define three abstract names to describe the place-list: <em>hwthreads</em>, <em>cores</em> and <em>sockets</em>.
+ It is up to the implementation to define what is meant to be a “core” 
+for instance, but of course we will provide some hints. The wording on 
+that is not yet completed, but it will be something along the lines of 
+hwthreads := smallest unit of execution capable of executing an OpenMP 
+thread; cores := set of execution units in which more than one 
+hardware-thread share some resources such as caches; sockets := physical
+ package of multiple cores.</p>
+<p>Of course defining a place-list does not lead to any thread affinity.
+ As I said above, the place list is just used to define the places the 
+threads of a parallel region can be bound to. In our proposal, the user 
+does not have to define an explicit mapping of threads to places (or 
+execution units in a place) – instead, the user can specify a so-called <em>affinity policy</em> via the new <em>affinity</em>
+ clause which can be put on a parallel region. Our proposal consists of 
+currently three affinity policies that allow to exploit the place-list 
+in several possible ways (the names might still change):</p>
+<ul>
+<li>SPREAD: spread OpenMP threads as evenly as possible among the 
+places. The place-list will be partitioned, so that subsequent threads 
+(i.e. nested OpenMP) will only be allocated within the partition. Given 
+the place-list outlined above, this policy would provide most dedicated 
+hardware resources to the OpenMP program.</li>
+<li>CLOSE: pack OpenMP threads near to the master thread. There is no 
+partitioning. Given the place-list from above, this policy would be used
+ if sharing of resources among threads is desirable.</li>
+<li>MASTER: collocate OpenMP threads with the master thread (in the same
+ place). This will ensure maximum locality to the master thread.</li>
+</ul>
+<p>It is important to understand that these affinity policies influence 
+the allocation of threads to places – not directly to the system 
+topology. In my example the (ordered!) place-list was designed so that 
+two threads far apart from each other also end up on physical cores far 
+apart in the system. Although we expect this to be the standard use 
+case, it does not necessarily have to be this way.</p>
+<p>Lets take a closer look at what the affinity policies do by looking 
+at some examples. The figure below shows what SPREAD will do. The green 
+box denotes the place-list, and for every number of threads &gt;=2 the 
+place-list will be partitioned when a parallel region with this affinity
+ clause is encountered. This will support nested OpenMP, as we will see 
+later on. Every thread will receive its own sub-place-list. If there are
+ more threads than places, more than one thread has to be allocated per 
+place. This will occur so that if threads i and i+1 are put together in 
+one place, this will also be the case for the OpenMP thread ids i and 
+i+1 (in this example with 16 threads: threads with OpenMP thread id 0 
+and 1 are on place 0).</p>
+<figure data-shortcode="caption" id="attachment_10304" style="width: 310px" class="wp-caption aligncenter"><a href="https://cterboven.files.wordpress.com/2012/06/affinity_example_spread.png"><img class="size-medium wp-image-10304" title="Affinity Example: SPREAD" src="openmp-affinity_files/affinity_example_spread.png" alt="Affinity Example: SPREAD" height="165" width="300"></a><figcaption class="wp-caption-text">Affinity Example: SPREAD</figcaption></figure>
+<p>Lets also take a brief look at the two other affinity policies we are
+ proposing, namely CLOSE and MASTER. Both are exampled in the figure 
+below. For CLOSE, threads i and i+1 are meant to reside on place j and 
+j+1, unless more than one thread will be allocated per place. For 
+MASTER, all threads will be put into the same place the master thread is
+ running on, unless this cannot be fulfilled by the implementation for 
+any reason.</p>
+<figure data-shortcode="caption" id="attachment_10307" style="width: 310px" class="wp-caption aligncenter"><a href="https://cterboven.files.wordpress.com/2012/06/affinity_example_close_master.png"><img class="size-medium wp-image-10307" title="Affinity Example: CLOSE and MASTER" src="openmp-affinity_files/affinity_example_close_master.png" alt="Affinity Example: CLOSE and MASTER" height="187" width="300"></a><figcaption class="wp-caption-text">Affinity Example: CLOSE and MASTER</figcaption></figure>
+<p>When discussing the proprietary support offered by OpenMP 
+implementers, I said that their solutions are static for the whole 
+program lifetime. In our proposal the initial place-list is fixed, but 
+the affinity policy might of course be set dynamically. Furthermore, the
+ figure below shows how nested OpenMP is supported. The outer parallel 
+region uses the SPREAD affinity policy to create partitions and to 
+maximize resource usage. The inner parallel region uses CLOSE to stay 
+within the respective partition.</p>
+<figure data-shortcode="caption" id="attachment_10310" style="width: 310px" class="wp-caption aligncenter"><a href="https://cterboven.files.wordpress.com/2012/06/affinity_example_nested_spread_close.png"><img class="size-medium wp-image-10310" title="Affinity Example with Nested OpenMP: SPREAD + CLOSE" src="openmp-affinity_files/affinity_example_nested_spread_close.png" alt="Affinity Example with Nested OpenMP: SPREAD + CLOSE" height="121" width="300"></a><figcaption class="wp-caption-text">Affinity Example with Nested OpenMP: SPREAD + CLOSE</figcaption></figure>
+<p>Whenever a new feature is intended to go into the OpenMP 
+specification, we require the existence of at least one reference 
+implementation to not only prove implementability, but also to get an 
+estimation of the effort it takes to be implemented. The reference 
+implementation for this proposal was done by Alexandre E. Eichenberger 
+in an experimental OpenMP runtime for the IBM BlueGene/Q system. Our 
+proposal does not affect performance critical parts of the 
+implementation, “just” the thread selection and allocation parts. 
+According to Alexandre’s findings the total overhead was less than 1 %, 
+which is in the order of system noise.</p>
+<p>Finally, let me summarize a few important properties / implications that I did not discuss in detail so far:</p>
+<ul>
+<li>If the place-list is constructed by enumerating the cores, it will 
+be done with the same naming scheme as used by the operating system. 
+This approach is also used by all vendor-proprietary extensions and 
+removes the need to define an explicit naming scheme, which might 
+confuse users if it is different from the operation system and also 
+might become inappropriate for future system topologies that we would 
+not foresee today.</li>
+<li>Every implementation will provide a default place-list to an OpenMP 
+program. It has to document what the default place-list is. I guess that
+ implementations will provide something like cores or hwthreads as a 
+default. This corresponds to the behavior that the number of threads to 
+be used if not specified by the user is also implementation defined 
+(some implementations use just 1 thread, others as many as there are 
+cores in the system).</li>
+<li>When one (or more) threads are allocated to a place, they are 
+allowed to migrate within this place if it contains more than one 
+execution unit (i.e. physical core). This will allow for both an 
+explicit thread-to-core binding as well as a more flexible as threads to
+ a socket, for example, depending on how the place-list is constructed 
+as well as which affinity policy is used.</li>
+<li>The binding of the initial thread may occur as early as the runtime 
+decides to be appropriate, but not later than when the first parallel 
+region is encountered.</li>
+</ul>
+<p>Thanks for reading until down here. More details can be found in the paper which is published by <a href="http://www.springerlink.com/content/03m04n367322u274/" target="_blank">Springer in IWOMP 2012</a>. Again, I welcome any comments or questions via <a href="mailto:christian@terboven.com">email</a>.</p>
+		<div class="wpcnt">
+			<div class="wpa wpmrec">
+				<a class="wpa-about" href="https://wordpress.com/about-these-ads/" rel="nofollow">About these ads</a>
+				<div class="u">
+					<script type="text/javascript">
+					(function(g){g.__ATA.initAd({sectionId:26942, width:300, height:250});})(window);
+					</script><div id="automattic-id-8509" data-section="26942" style="width:300px; height:250px;"><iframe src="javascript:&quot;<html><body style='background:transparent;margin:0%;'></body></html>&quot;" id="fif_slot_automattic-id-_automattic-id-8509" name="fif_slot_automattic-id-_automattic-id-8509" scrolling="no" style="border:none;width:300px;height:250px;" frameborder="0" height="250" width="300"></iframe></div>
+				</div>
+			</div>
+		</div><div id="jp-post-flair" class="sharedaddy sd-like-enabled sd-sharing-enabled"><div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><h3 class="sd-title">Share this via:</h3><div class="sd-content"><ul><li class="share-email share-service-visible"><a rel="nofollow" data-shared="" class="share-email sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/?share=email&amp;nb=1" target="_blank" title="Click to email"><span>Email</span></a></li><li class="share-twitter"><a rel="nofollow" data-shared="sharing-twitter-10280" class="share-twitter sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/?share=twitter&amp;nb=1" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-facebook"><a rel="nofollow" data-shared="sharing-facebook-10280" class="share-facebook sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/?share=facebook&amp;nb=1" target="_blank" title="Share on Facebook"><span>Facebook</span></a></li><li class="share-google-plus-1"><a rel="nofollow" data-shared="sharing-google-10280" class="share-google-plus-1 sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/?share=google-plus-1&amp;nb=1" target="_blank" title="Click to share on Google+"><span>Google</span></a></li><li class="share-pocket"><a rel="nofollow" data-shared="" class="share-pocket sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/?share=pocket&amp;nb=1" target="_blank" title="Click to share on Pocket"><span>Pocket</span></a></li><li class="share-print"><a rel="nofollow" data-shared="" class="share-print sd-button share-icon" href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></li></ul></div></div></div><div class="sharedaddy sd-block sd-like jetpack-likes-widget-wrapper jetpack-likes-widget-loaded" id="like-post-wrapper-5383873-10280-57305a583afa3" data-src="//widgets.wp.com/likes/#blog_id=5383873&amp;post_id=10280&amp;origin=cterboven.wordpress.com&amp;obj_id=5383873-10280-57305a583afa3" data-name="like-post-frame-5383873-10280-57305a583afa3"><h3 class="sd-title">Like this:</h3><div class="likes-widget-placeholder post-likes-widget-placeholder" style="height: 55px; display: none;"><span class="button"><span>Like</span></span> <span class="loading">Loading...</span></div><iframe class="post-likes-widget jetpack-likes-widget" name="like-post-frame-5383873-10280-57305a583afa3" src="openmp-affinity_files/a.html" frameborder="0" height="55px" width="100%"></iframe><span class="sd-text-color"></span><a class="sd-link-color"></a></div></div>	</div><!-- .entry-content -->
+
+	<footer class="entry-footer">
+		<span class="byline"><span class="author vcard"><span class="screen-reader-text">Author </span> <a class="url fn n" href="https://terboven.com/author/cterboven/">cterboven</a></span></span><span class="posted-on"><span class="screen-reader-text">Posted on </span><a href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/" rel="bookmark"><time class="entry-date published updated" datetime="2012-06-21T08:49:11+00:00">June 21, 2012</time></a></span><span class="cat-links"><span class="screen-reader-text">Categories </span><a href="https://terboven.com/category/numa/" rel="category tag">NUMA</a>, <a href="https://terboven.com/category/openmp/" rel="category tag">OpenMP</a></span><span class="tags-links"><span class="screen-reader-text">Tags </span><a href="https://terboven.com/tag/binding/" rel="tag">Binding</a>, <a href="https://terboven.com/tag/cc-numa/" rel="tag">cc-NUMA</a>, <a href="https://terboven.com/tag/iwomp/" rel="tag">IWOMP</a>, <a href="https://terboven.com/tag/openmp/" rel="tag">OpenMP</a>, <a href="https://terboven.com/tag/scalemp/" rel="tag">ScaleMP</a>, <a href="https://terboven.com/tag/threading/" rel="tag">Threading</a></span>			</footer><!-- .entry-footer -->
+</article><!-- #post-## -->
+
+<div id="comments" class="comments-area">
+
+			<h2 class="comments-title">
+			2 thoughts on “The Design of OpenMP Thread&nbsp;Affinity”		</h2>
+
+		
+		<ol class="comment-list">
+					<li id="comment-315" class="comment even thread-even depth-1 highlander-comment">
+			<article id="div-comment-315" class="comment-body">
+				<footer class="comment-meta">
+					<div class="comment-author vcard">
+												<b class="fn"><a href="http://www.lojanotebook.com/" rel="external nofollow" class="url">Alzira</a></b> <span class="says">says:</span>					</div><!-- .comment-author -->
+
+					<div class="comment-metadata">
+						<a href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/#comment-315">
+							<time datetime="2012-06-22T17:05:37+00:00">
+								June 22, 2012 at 5:05 pm							</time>
+						</a>
+											</div><!-- .comment-metadata -->
+
+									</footer><!-- .comment-meta -->
+
+				<div class="comment-content">
+					<p>this is very useful article for many users. thanks for putting across these details in this article.<a href="http://www.lojanotebook.com/" rel="nofollow">http://www.lojanotebook.com</a></p>
+				</div><!-- .comment-content -->
+
+							</article><!-- .comment-body -->
+</li><!-- #comment-## -->
+		<li id="comment-392" class="comment odd alt thread-odd thread-alt depth-1 highlander-comment">
+			<article id="div-comment-392" class="comment-body">
+				<footer class="comment-meta">
+					<div class="comment-author vcard">
+												<b class="fn"><a href="http://www.open-mpi.org/projects/hwloc/" rel="external nofollow" class="url">Brice</a></b> <span class="says">says:</span>					</div><!-- .comment-author -->
+
+					<div class="comment-metadata">
+						<a href="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/#comment-392">
+							<time datetime="2012-10-30T14:12:24+00:00">
+								October 30, 2012 at 2:12 pm							</time>
+						</a>
+											</div><!-- .comment-metadata -->
+
+									</footer><!-- .comment-meta -->
+
+				<div class="comment-content">
+					<p>Looks like this will perfectly match all the information that hwloc reports.</p>
+<p>By the way, your claim about hwloc vs 8-socket opteron in the IWOMP 
+paper is invalid. First, there are no 8-socket opteron anymore, it’s 4 
+sockets fully-connected now. Intel has some not-fully connected machines
+ (with more than 4-sockets) but that’s very rare anyway.</p>
+<p>Secondly, hwloc’s view of the hardware isn’t only a tree. It’s a tree
+ when it comes to representing “inclusion” (which core is inside which 
+cache or which socket) and that’s what most people want.  But there is 
+also some information about object distances. This cannot be displayed 
+in the tree, it’s stored as annotations of each hierarchical level on 
+the side of the tree. If the BIOS/OS reports some distance info, or if 
+the user/admin supplies it, you can find out NUMA distances from hwloc 
+too.</p>
+				</div><!-- .comment-content -->
+
+							</article><!-- .comment-body -->
+</li><!-- #comment-## -->
+		</ol><!-- .comment-list -->
+
+		
+	
+			<p class="no-comments">Comments are closed.</p>
+	
+	
+</div><!-- .comments-area -->
+
+	<nav class="navigation post-navigation" role="navigation">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://terboven.com/2011/12/29/on-the-future-of-hpc-on-windows/" rel="prev"><span class="meta-nav" aria-hidden="true">Previous</span> <span class="screen-reader-text">Previous post:</span> <span class="post-title">On the future of HPC on&nbsp;Windows</span></a></div><div class="nav-next"><a href="https://terboven.com/2012/09/11/several-event-annoucements/" rel="next"><span class="meta-nav" aria-hidden="true">Next</span> <span class="screen-reader-text">Next post:</span> <span class="post-title">Several Event Annoucements</span></a></div></div>
+	</nav>
+	</main><!-- .site-main -->
+
+	
+</div><!-- .content-area -->
+
+
+	<aside id="secondary" class="sidebar widget-area" role="complementary">
+		<section id="categories-265129921" class="widget widget_categories"><h2 class="widget-title">Categories</h2>		<ul>
+	<li class="cat-item cat-item-7215"><a href="https://terboven.com/category/book-review/">Book Review</a>
+</li>
+	<li class="cat-item cat-item-60152879"><a href="https://terboven.com/category/future-of-hpc/">Future of HPC</a>
+</li>
+	<li class="cat-item cat-item-259514"><a href="https://terboven.com/category/numa/">NUMA</a>
+</li>
+	<li class="cat-item cat-item-68829424"><a href="https://terboven.com/category/openacc/">OpenACC</a>
+</li>
+	<li class="cat-item cat-item-1614951"><a href="https://terboven.com/category/openmp/">OpenMP</a>
+</li>
+	<li class="cat-item cat-item-19"><a href="https://terboven.com/category/private/">Private</a>
+</li>
+	<li class="cat-item cat-item-155567"><a href="https://terboven.com/category/tasking/">Tasking</a>
+</li>
+	<li class="cat-item cat-item-4851"><a href="https://terboven.com/category/university/">University</a>
+</li>
+	<li class="cat-item cat-item-2672719"><a href="https://terboven.com/category/windows-hpc/">Windows-HPC</a>
+</li>
+		</ul>
+</section>	</aside><!-- .sidebar .widget-area -->
+
+		</div><!-- .site-content -->
+
+		<footer id="colophon" class="site-footer" role="contentinfo">
+							<nav class="main-navigation" role="navigation" aria-label="Footer Primary Menu">
+					<div class="menu-pages-menu-container"><ul id="menu-pages-menu-1" class="primary-menu"><li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-10517"><a href="https://terboven.com/">Home</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10518"><a href="https://terboven.com/about/">About me</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10519"><a href="https://terboven.com/publications/">Publications</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10520"><a href="https://terboven.com/talks-misc/">Talks and Misc.</a></li>
+</ul></div>				</nav><!-- .main-navigation -->
+			
+			
+			<div class="site-info">
+				<a href="https://wordpress.com/themes/twentysixteen/" title="Learn more about this theme">The Twenty Sixteen Theme</a>.				<span class="site-title"><a href="https://terboven.com/" rel="home">Parallel Programming and High Performance Computing (HPC)</a></span>
+				<a href="https://wordpress.com/?ref=footer_blog">Blog at WordPress.com.</a>
+			</div><!-- .site-info -->
+		</footer><!-- .site-footer -->
+	</div><!-- .site-inner -->
+</div><!-- .site -->
+
+<!-- wpcom_wp_footer -->
+	<div style="display:none">
+	</div>
+
+	<div style="bottom: -392px;" id="bit" class="loggedout-follow-normal">
+		<a class="bsub" href="javascript:void(0)"><span id="bsub-text">Follow</span></a>
+		<div id="bitsubscribe">
+
+					<h3><label for="loggedout-follow-field">Follow “Parallel Programming and High Performance Computing (HPC)”</label></h3>
+
+			<form action="https://subscribe.wordpress.com" method="post" accept-charset="utf-8" id="loggedout-follow">
+			<p>Get every new post delivered to your Inbox.</p>
+
+			<p id="loggedout-follow-error" style="display: none;"></p>
+
+						<p class="bit-follow-count">Join 201 other followers</p>
+			<p><input name="email" placeholder="Enter your email address" id="loggedout-follow-field" type="email"></p>
+
+			<input name="action" value="subscribe" type="hidden">
+			<input name="blog_id" value="5383873" type="hidden">
+			<input name="source" value="https://terboven.com/2012/06/21/the-design-of-openmp-thread-affinity/" type="hidden">
+			<input name="sub-type" value="loggedout-follow" type="hidden">
+
+			<input id="_wpnonce" name="_wpnonce" value="8025cb1c0f" type="hidden"><input name="_wp_http_referer" value="/2012/06/21/the-design-of-openmp-thread-affinity/" type="hidden">
+			<p id="bsub-subscribe-button"><input value="Sign me up" type="submit"></p>
+			</form>
+					<div id="bsub-credit"><a href="https://wordpress.com/?ref=lof">Build a website with WordPress.com</a></div>
+		</div><!-- #bitsubscribe -->
+	</div><!-- #bit -->
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/terboven.com\/2012\/06\/21\/the-design-of-openmp-thread-affinity\/":10280};
+	</script>
+	
+		<script type="text/javascript">
+			var windowOpen;
+		jQuery(document).on( 'ready post-load', function(){
+			jQuery( 'a.share-twitter' ).on( 'click', function() {
+				if ( 'undefined' !== typeof windowOpen ){ // If there's another sharing window open, close it.
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery(this).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+		});
+		</script>
+				<script type="text/javascript">
+			var windowOpen;
+		jQuery(document).on( 'ready post-load', function(){
+			jQuery( 'a.share-facebook' ).on( 'click', function() {
+				if ( 'undefined' !== typeof windowOpen ){ // If there's another sharing window open, close it.
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery(this).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+		});
+		</script>
+				<script type="text/javascript">
+			var windowOpen;
+		jQuery(document).on( 'ready post-load', function(){
+			jQuery( 'a.share-google-plus-1' ).on( 'click', function() {
+				if ( 'undefined' !== typeof windowOpen ){ // If there's another sharing window open, close it.
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery(this).attr( 'href' ), 'wpcomgoogle-plus-1', 'menubar=1,resizable=1,width=480,height=550' );
+				return false;
+			});
+		});
+		</script>
+				<script type="text/javascript">
+			var windowOpen;
+		jQuery(document).on( 'ready post-load', function(){
+			jQuery( 'a.share-pocket' ).on( 'click', function() {
+				if ( 'undefined' !== typeof windowOpen ){ // If there's another sharing window open, close it.
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery(this).attr( 'href' ), 'wpcompocket', 'menubar=1,resizable=1,width=450,height=450' );
+				return false;
+			});
+		});
+		</script>
+		<script type="text/javascript">
+/* <![CDATA[ */
+var screenReaderText = {"expand":"expand child menu","collapse":"collapse child menu"};
+/* ]]> */
+</script>
+<script type="text/javascript">
+/* <![CDATA[ */
+var JetpackEmojiSettings = {"base_url":"https:\/\/s0.wp.com\/wp-content\/mu-plugins\/emoji\/twemoji\/"};
+/* ]]> */
+</script>
+<script type="text/javascript">
+/* <![CDATA[ */
+var sharing_js_options = {"lang":"en","counts":"1"};
+/* ]]> */
+</script>
+<script type="text/javascript" src="openmp-affinity_files/a_002"></script>
+<script type="text/javascript">
+// <![CDATA[
+(function() {
+try{
+  if ( window.external &&'msIsSiteMode' in window.external) {
+    if (window.external.msIsSiteMode()) {
+      var jl = document.createElement('script');
+      jl.type='text/javascript';
+      jl.async=true;
+      jl.src='/wp-content/plugins/ie-sitemode/custom-jumplist.php';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(jl, s);
+    }
+  }
+}catch(e){}
+})();
+// ]]>
+</script>	<script type="text/javascript">
+	var skimlinks_pub_id = "725X584219"
+	var skimlinks_sitename = "cterboven.wordpress.com";
+	</script>
+	<script type="text/javascript" src="openmp-affinity_files/725X1342.js"></script>		<iframe src="openmp-affinity_files/master.html" scrolling="no" id="likes-master" name="likes-master" style="display:none;"></iframe>
+		<div id="likes-other-gravatars"><div class="likes-text"><span>%d</span> bloggers like this:</div><ul class="wpl-avatars sd-like-gravatars"></ul></div>
+		<script>
+			var _comscore = _comscore || [];
+			_comscore.push({
+				c1: "2",
+				c2: "7518284"
+			});
+			(function() {
+				var s = document.createElement("script"),
+					el = document.getElementsByTagName("script")[0];
+				s.async = true;
+				s.src = (document.location.protocol == "https:" ? "https://sb" : "http://b") + ".scorecardresearch.com/beacon.js";
+				el.parentNode.insertBefore(s, el);
+			})();
+		</script>
+		<noscript>
+			<p class="robots-nocontent"><img src="https://sb.scorecardresearch.com/p?c1=2&c2=7518284&c3=&c4=&c5=&c6=&c15=&cv=2.0&cj=1" alt="" style="display:none;" width="1" height="1" /></p>
+		</noscript><script src="openmp-affinity_files/w.js" type="text/javascript" async="" defer="defer"></script>
+<script type="text/javascript">
+_tkq = window._tkq || [];
+_stq = window._stq || [];
+_tkq.push(['storeContext', {'blog_id':'5383873','blog_tz':'1','user_lang':'en','blog_lang':'en','user_id':'0'}]);
+_stq.push(['view', {'blog':'5383873','v':'wpcom','tz':'1','user_id':'0','post':'10280','subd':'cterboven'}]);
+_stq.push(['extra', {'crypt':'UE5XaGUuOTlwaD85flAmcm1mcmZsaDhkV11YdWtpP0NsWnVkPS9sL0ViLndld3BYdHJlenxESDRhVzVqaE84VHpoTXVWZkI9YyVqP0s3T015MT1bNS5SRFNaVlhkRzk5fkpFRmcmeE5kZ0lnRlZ0PXZUJixRMGJ5MyUtK1lmZFZYQ3F+STI0SHlsQTJwMTV4OUNZTE0xZVhVV0RtPVQlTUx6a1o1T2Vlc25UYUxIcC5GWTVOci1XenBRaS9dTkZ8M3U3N2xNZ0VxMzRaQ2lGPUp3NTQsJS5tXTRYM0lUZC5QQ0pmTGU1fHhPRzVRdmVwN1BxMjhCLGh8aFh8V0tRQlRyM1c0LXUtQ25hWDd4Wll+aUksTCY='}]);
+_stq.push([ 'clickTrackerInit', '5383873', '10280' ]);
+	</script>
+<noscript><img src="https://pixel.wp.com/b.gif?v=noscript" style="height:0px;width:0px;overflow:hidden" alt="" /></noscript>
+<script>
+if ( 'object' === typeof wpcom_mobile_user_agent_info ) {
+
+	wpcom_mobile_user_agent_info.init();
+	var mobileStatsQueryString = "";
+	
+	if( false !== wpcom_mobile_user_agent_info.matchedPlatformName )
+		mobileStatsQueryString += "&x_" + 'mobile_platforms' + '=' + wpcom_mobile_user_agent_info.matchedPlatformName;
+	
+	if( false !== wpcom_mobile_user_agent_info.matchedUserAgentName )
+		mobileStatsQueryString += "&x_" + 'mobile_devices' + '=' + wpcom_mobile_user_agent_info.matchedUserAgentName;
+	
+	if( wpcom_mobile_user_agent_info.isIPad() )
+		mobileStatsQueryString += "&x_" + 'ipad_views' + '=' + 'views';
+
+	if( "" != mobileStatsQueryString ) {
+		new Image().src = document.location.protocol + '//pixel.wp.com/g.gif?v=wpcom-no-pv' + mobileStatsQueryString + '&baba=' + Math.random();
+	}
+	
+}
+</script>
+
+<div id="sharing_email" style="display: none;">
+		<form action="/2012/06/21/the-design-of-openmp-thread-affinity/" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input name="target_email" id="target_email" type="email">
+
+			
+				<label for="source_name">Your Name</label>
+				<input name="source_name" id="source_name" type="text">
+
+				<label for="source_email">Your Email Address</label>
+				<input name="source_email" id="source_email" type="email">
+
+						<input id="jetpack-source_f_name" name="source_f_name" class="input" size="25" autocomplete="off" type="text">
+			<script> document.getElementById('jetpack-source_f_name').value = ''; </script>
+			<div class="recaptcha" id="sharing_recaptcha"></div><input name="recaptcha_public_key" id="recaptcha_public_key" value="6LcYW8MSAAAAADBAuEH9yaPcF7lWh11Iq62ZKtoo" type="hidden">
+			<img style="float: right; display: none" class="loading" src="openmp-affinity_files/loading.gif" alt="loading" height="16" width="16">
+			<input value="Send Email" class="sharing_send" type="submit">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div><img id="wpstats" alt=":)" src="openmp-affinity_files/g.gif"></body></html>

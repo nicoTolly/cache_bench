@@ -12,6 +12,7 @@
 \usepackage{hyperref}
 
 \usepackage{mathtools}
+\usepackage{amsthm}
 
 \usepackage[french]{babel}
 
@@ -35,6 +36,7 @@ breaklines=true,        % sets automatic line breaking
 breakatwhitespace=false,    % sets if automatic breaks should only happen at whitespace
 escapeinside={\%*}{*)}          % if you want to add a comment within your code
 }
+
 
 %\singlespacing 
 %\onehalfspacing 
@@ -1455,7 +1457,37 @@ simplement de choisir le LRU (Least Recently Used) à savoir l'élément le moin
 Pour des raisons d'implémentations, il existe des versions plus simples censées approximer un 
 comportement de LRU dénommée PLRU pour Pseudo-LRU. On décrira cette stratégie un peu plus loin, 
 avec quelques autres, quand il s'agira de les émuler. Ces bases suffiront pour le moment.
-\section{}
+\section{Première tentative}
+Le problème de la politique de remplacement est que son implémentation n'est pas rendu publique
+par les constructeurs et notamment par Intel. Dans un premier temps, l'hypothèse a été faite
+que l'architecture suivait peu ou prou une politique LRU, qui est certainement la plus répandue
+dans l'ensemble des politiques de remplacement de cache (sans parler spécialement de cache 
+de processeur). La question est alors la suivante : étant donné un nombre de thread et la 
+quantité de données auxquelles ils vont accéder, que pourra-t-on dire des débits que chacun 
+des threads pourra espérer atteindre ? Le cas qui nous intéresse réellement est celui où
+la somme des données accédées par les threads est supérieure à la taille du cache, mais où
+au moins certains threads accèdent à des données de taille inférieure au cache. Les prévisions
+sont simples dans le cas où la totalité des données tient dans le cache (taux de miss de 0 
+pour tout le monde) ou celui dans lequel aucun des threads n'a de données tenant dans le
+cache (taux de miss attendu de 1).
+\\L'intuition de base était la suivante : quand un thread accédait à un plus grand nombre de
+données, ou encore accédait à ses données plus lentement que d'autres, alors il risquait
+de voir ses données constituer une cible privilégiée pour l'éviction. De ce fait, on s'attendrait
+à ce qu'il subisse un nombre de miss plus important, et donc qu'il soit pénalisé en terme de
+bande-passante. Restait à formaliser cette intuition plus convenablement.
+\\J'ai formulé une première prévision pratique. Toujours en supposant une politique LRU, on
+peut affirmer la chose suivante : 
+\newtheorem{th1}{Théorème}
+\begin{th1}
+Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
+accèdent respectivement. Pour tout thread i, si $T_i$ est inférieur à $\frac{C}{N}$, où C est la 
+taille du cache, alors le thread i ne subira aucun miss.
+\end{th1}
+Pour la preuve, on fait aussi l'hypothèse que, comme dans notre benchmark, l'accès aux données
+est linéaire et boucle sur lui-même. C'est une hypothèse forte mais elle permet d'avoir une 
+bonne idée du moment où une donnée va être réaccédée, ce qui autorise une réflexion plus formelle.
+On espère simplement que les résultats obtenus pourront être au moins qualitativement pertinents
+pour d'autres types d'accès.
 \bibliographystyle{plain} 
 \bibliography{report}
 \end{document}
