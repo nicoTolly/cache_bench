@@ -13,6 +13,8 @@
 
 \usepackage{mathtools}
 
+\usepackage[french]{babel}
+
 \usepackage{color}
 \usepackage{listings}
 \lstset{ %
@@ -520,7 +522,7 @@ l'hypothèse où le programmeur aurait alloué plus d'espace qu'il n'en utilise 
 pour les données réellements accédées. Dans le cas d'une machine NUMA, on apporte la garantie supplémentaire
 que la page demandée sera allouée sur le noeud du processeur qui a réalisé le premier accès à la variable.
 On espère ainsi faire en sorte que les données soient allouées sur les noeuds où elles seront le plus
-souvent accédés.
+souvent accédés.\cite{numaaware}
 \\J'ai cherché à vérifier ce qu'il en était sur la machine que j'avais à disposition. Il existe une fonction
 bas niveau permettant, selon les paramètres, de déplacer une page vers un noeud donné, ou encore d'obtenir 
 le noeud sur lequel cette page se trouve au moment de l'appel : il s'agit de move\_pages. Ainsi l'appel
@@ -1106,7 +1108,7 @@ régulièrement des erreurs au moment de l'exécution que je n'ai pas réellemen
 cette configuration, les mallocs échouaient dès que la taille allouée devenait trop grande. Il a donc
 fallu réaliser l'allocation et l'initialisation dans la partie séquentielle. Pour cela, on récupére
 le nombre de threads (qu'on indiquait en lançant le programme avec la variable 
-OMP\_NUM\_THREADS\=nb thread>) puis on alloue un tableau de taille (taille de tableau par thread *
+OMP\_NUM\_THREADS) puis on alloue un tableau de taille (taille de tableau par thread *
 nombre de threads) de la manière suivante : 
 \begin{lstlisting}
 #pragma omp parallel
@@ -1310,7 +1312,7 @@ progressivement. Ainsi, les premiers tests que j'ai pu effectués l'ont été av
 de ce qu'allait ensuite devenir le programme. Le benchmark tel que je l'avais écrit sur le moment 
 était notamment compilé sans optimisation, sans que je mesure l'impact qu'une telle décision pouvait
 avoir sur la performance. Le fait que les placements de threads d'OpenMP pouvait avoir une influence
-sur le comportement du programme meme après la sortie de la zone parallélisé m'échappait. Enfin, les
+sur le comportement du programme même après la sortie de la zone parallélisé m'échappait. Enfin, les
 accès réalisés n'étaient pas vectoriels et on peut imaginer que je n'utilisais pas toute la 
 bande-passante disponible.
 \\Tous ces paramètres ont fait que la différence entre les accès distants et locaux semblaient 
@@ -1323,19 +1325,137 @@ seront accédées et tenter de les rapatrier en avance dans le cache. Il paraiss
 plausible que cette stratégie puisse mitiger les écarts de performance, surtout dans la mesure où
 mes accès étaient linéaires et particulièrement prévisibles. Une politique de localité qui rapatrierait
 par avance les données consécutives à celles déjà accédées était susceptible dans mon cas de donner
- de bons résultats. Cependant, mes recherches effectuées sur le sujet ne semblaient pas montrer
- l'existence d'un préfetch hardware automatique très avancé en l'état actuel de la technologie.
- Il est vrai que le secret tenu par les constructeurs comme Intel sur leurs design pouvait
- éventuellement expliquer le peu de littérature sur le sujet.
- \\J'ai eu l'occasion de revenir plus tard sur ces premiers résultats avec plus de recul et beaucoup
- plus de maitrise que je n'en avais sur le moment. Avec un programme au point et bien testé, il
- a finalement été possible de mettre en évidence des écarts de performances très notables. Les 
- comportements ressemblent plus à ceux auxquels on pouvait s'attendre. Tant que les données chargées
- d'une part par les threads locaux, d'autre part par les threads distants tiennent dans le cache 
- que partagent tous les coeurs d'un meme noeud, il n'y a aucune différence de performance. Cependant,
- dès que les données chargées ne tiennent plus dans le cache et qu'on doit donc accéder à la mémoire
- principale, et donc à un noeud distant pour les threads ostracisés, on observe la différence de 
- performance attendue.
+de bons résultats. Cependant, mes recherches effectuées sur le sujet ne semblaient pas montrer
+l'existence d'un préfetch hardware automatique très avancé en l'état actuel de la technologie.
+Il est vrai que le secret tenu par les constructeurs comme Intel sur leurs design pouvait
+éventuellement expliquer le peu de littérature sur le sujet. De fait, la technologie semble 
+aujourd'hui limitée au prefetch d'instructions (le flot étant plus prévisible) ou éventuellement
+au prefetch software, guidé par le programmeur \cite{prefetchgcc}.
+\\J'ai eu l'occasion de revenir plus tard sur ces premiers résultats avec plus de recul et beaucoup
+plus de maitrise que je n'en avais sur le moment. Avec un programme au point et bien testé, il
+a finalement été possible de mettre en évidence des écarts de performances très notables. Les 
+comportements ressemblent plus à ceux auxquels on pouvait s'attendre. Tant que les données chargées
+d'une part par les threads locaux, d'autre part par les threads distants tiennent dans le cache 
+que partagent tous les coeurs d'un même noeud, il n'y a aucune différence de performance. Cependant,
+dès que les données chargées ne tiennent plus dans le cache et qu'on doit donc accéder à la mémoire
+principale, et donc à un noeud distant pour les threads ostracisés, on observe la différence de 
+performance attendue. Par exemple, sur Idchire qui possède un cache de 20 Mébioctets, 2 threads
+chargeant chacun 96 Mebioctets, l'un depuis le noeud local, l'autre depuis le noeud distant,
+atteindront respectivement des débits de 10GB/s et 2GB/s respectivement, soit une perte de plus
+de 80\%. Aucune perte n'est par contre observable si les threads chargent significativement 
+moins de 20 mebioctets.
+\subsection{Partage des ressources}
+J'ai fait tourner mon benchmark, pour différents nombres de threads (dans la limite du nombre de coeurs
+partageant un cache) et avec une taille de tableau croissante. Dans un premier temps, chaque thread 
+réalise exactement le même travail. Les graphiques \ref{fig:idchbench} et \ref{fig:dracbench} 
+montrent l'évolution de la bande-passante globale respectivement sur Idchire et Dracula. Il est à 
+noter que les threads ont un comportement très symétrique, aucun ne semble prendre le pas ou être
+plus pénalisé. C'est pour cela que l'on se contente d'afficher la bande-passante globale. La taille
+du cache est indiquée par la ligne verticale rouge.
+\begin{figure}
+  \includegraphics[width=\linewidth]{bandwidth_idch.pdf}
+  \label{fig:idchbench}
+\end{figure}
+\begin{figure}
+  \includegraphics[width=\linewidth]{bench_dracula.pdf}
+  \label{fig:dracbench}
+\end{figure}
+On apprend d'autres choses grâce à ces graphiques. Notamment, le partage des ressources se fait
+différemment selon que les données tiennent ou non dans le cache. On s'aperçoit que le débit global est 
+proportionnel au nombre de threads lorsque les données tiennent dans le cache (donc que le débit 
+individuel est constant relativement au nombre de threads pour une quantité de données fixée). Ce débit
+global est par contre constant lorsque les threads vont chercher leurs données en mémoire. Cela signifie
+que les threads n'interfèrent pas entre eux lorsqu'ils chargent des données depuis le cache, 
+mais qu'ils entrent en concurrence et se partagent la bande-passante disponible lorqu'ils doivent 
+accéder à la mémoire principale.
+\\Autre observation : sur chacune des deux architectures, il faut un certain nombre de threads pour
+atteindre la saturation de la bande-passante. Ainsi, sur dracula, on voit que quand le seuil de
+20 GB/s est atteint avec deux, trois et quatre threads, un thread seul n'arrive pas à faire
+mieux que 15 GB/s. De même, sur dracula, là où cinq, six ou huit threads parviennent à obtenir
+un débit global de 35GB/s environ, moins de quatre threads ne parviennent pas à saturation.
+\\Ces résultats laissent supposer que plusieurs ressources sont en jeu qui peuvent chacune
+faire office de goulot d'étranglement pour la bande-passante globale. La ressource partagée devient
+limitante quand trop de threads essaient d'en profiter à la fois. Lorsque ce n'est pas le cas,
+c'est la ressource individuelle qui devient limitante. 
+\subsection{En guise de première conclusion }
+Nous avons donc programmé un benchmark d'évaluation de la bande-passante mémoire qui permet 
+d'estimer les capacités en mémoire. Il a la particularité d'être utilisable en multithread
+comme dans un programme simple, et d'être plus modulable qu'un programme comme bandwidth, même
+si ce dernier est adapté à plus d'architecture et qu'il teste plus exhaustivement les ressources.
+Mon travail a été intégré dans la suite de benchmarks de l'équipe (sous l'impulsion d'un étudiant 
+invité dans l'équipe qui travaille sur un projet de normalisation et de mise en commun des benchmarks 
+dans le monde scientifique). Il a également été utilisé dans le cadre d'un autre projet de l'équipe
+qui a besoin de diverses méthodes pour estimer les ressources d'une machine.
+\\Fort de ces résultats, on peut maintenant s'attaquer au problème qui nous motivait
+au départ : la prédiction des performances et du partage du cache par différents threads.
+
+\chapter{Modèle de prédiction de bande-passante et d'accès au cache}
+Ce travail a occupé toute la dernière partie de mon stage. Il est encore incomplet, quand bien
+même il offre certaines promesses - ainsi que des limitations qui n'ont pas encore pu être dépassées.
+Savoir s'il sera poursuivi est une autre question qui n'a pas encore de réponse - peut-être serai-je
+en mesure de reprendre et d'apporter une conclusion un peu plus tard. En attendant, je vais
+présenter ici l'état dans lequel je me suis trouvé à la fin du stage. Il manque encore, au minimum,
+un test plus poussé de la dernière version du modèle qui nous permettrait d'évaluer sa pertinence.
+On avait construit sur la fin un modèle de prédiction sur une base empirique, comme on l'expliquera
+dans la suite. Nous allons néanmoins commencer par poser quelques bases sur le fonctionnement d'un
+cache dans une architecture et les problématiques qui se sont posées.
+
+\section{Cache et bande-passante}
+Le principe du cache et son intérêt avait déjà été présenté plus haut dans le chapitre sur la 
+hierarchie mémoire. L'idée est d'offrir aux coeurs des portions de mémoire plus proche et plus 
+rapide que la mémoire principale, et d'espérer que le programme trouvera aussi souvent que possible
+une donnée dans le cache et non dans la mémoire. En effet, les emplacements du cache ne sont pas
+réellement adressables : toute donnée présente dans un cache est une réplication d'une donnée
+présente dans la mémoire. Lorsqu'un coeur veut faire un accès à une donnée, il s'adresse à son 
+cache pour savoir s'il détient cette donnée. Si c'est le cas, on a un hit et l'utilisation du
+cache était gagnante. Sinon, on a un miss, le coeur doit aller chercher sa donnée en mémoire,
+ce qui entraîne une pénalité. Le débit atteint par un programme va dépendre fortement du taux
+de miss et du nombre de fois où il a dû aller chercehr une donnée en mémoire. Plus ce taux est
+important, plus le débit est faible.
+\\Une architecture peut disposer de plusieurs niveaux de cache, les niveaux étant de taille
+croissante et de vitesse d'accès décroissante. Chacun des niveaux peut être partagée par plusieurs
+coeurs ou être privé. En général, le tout dernier niveau est partagé, alors que les niveaux au-dessus
+sont privés. Par exemple, Idchire et Dracula disposent tous deux de trois niveaux de caches, les deux
+premiers étant privés tandis que le dernier est partagé entre tous les coeurs pour Dracula, et entre
+tous les coeurs d'un noeud (donc entre huit coeurs) pour Idchire.
+\\Le fait qu'il existe plusieurs niveaux de cache oblige à répondre à des questions sur la localité
+et la duplication des données : une donnée situé dans le cache le plus proche du coeur doit-elle ou
+non se trouver dans les caches en dessous ? Les constructeurs proposent différents types de réponses
+à cette question que nous n'allons pas développer ici. De même, le partage d'un cache impose de 
+répondre à des problématiques de maintien de la cohérence entre des données partagées que nous ne
+traiterons pas non plus. Nous ne parlerons pas plus de la question du moment où une écriture
+qui a été faite dans le cache sera répercutée en mémoire principale. Ce document \cite{cachebus} 
+quand bien même il est déjà ancien, fait une bonne synthèse de tous ces sujets dans sa première
+partie.
+\\Ce qui nous intéresse surtout ici, c'est la politique de remplacement des données dans le cache. 
+Quand le cache est rempli et qu'un accès quelconque à une donnée non présente dans le cache est
+fait, la donnée accédée est placée dans le cache de manière à pouvoir être disponible plus 
+rapidement pour un prochain accès. On tire ici parti du principe de localité temporelle qui 
+veut qu'une donnée accédée récemment ait toutes les chances d'être réaccédée rapidement dans 
+le futur. La question est de savoir quelle donnée sera sacrifiée pour laisser sa place à la
+nouvelle arrivée. Plusieurs paramètres interviennent à ce moment-là.
+\\Précisons d'abord que la granularité de base d'un cache est la taille de ce qu'on appelle
+un bloc ou une ligne, une valeur courante étant 64 octets. Cela signifie que les données
+sont toujours stockées dans le cache par bloc de 64 octets consécutifs, jamais moins. La
+question est de savoir combien d'emplacements sont disponibles dans le cache pour un bloc
+d'une adresse particulière. La réponse est le résultat d'un compromis : si une ligne pouvait
+être stockée n'importe où dans le cache, alors il y aura une pénalité importante liée au coût
+de la recherche de la donnée dans le cache. D'un autre côté, si une adresse ne pouvait être
+stocké qu'à un seul emplacement, on pourrait s'attendre à ce que le cache soit utilisé de 
+manière suboptimale. Le nombre de choix possibles pour une ligne est appelé l'associativité
+du cache. Cette associativité est de 12 pour Dracula. L'ensemble d'emplacements dans lequel
+une ligne peut être mise en cache est appelé un set.
+\\La question est donc de savoir comment est fait, dans un set, le choix de la ligne qui sera
+remplacée. À nouveau, bien des techniques existent et dépendent du constructeur. Une technique
+simple à mettre en place serait d'implémenter un simple FIFO (First-In First-Out). Seulement,
+cela signifierait qu'une donnée entrée dans le cache il y a un long moment, mais qui a été utilisée 
+à de nombreuses reprises depuis, pourrait être évictée au profit d'une donnée entrée dans le cache 
+plus récemment mais qui n'aurait pas été réutilisée depuis. Une politique plus élaborée serait
+simplement de choisir le LRU (Least Recently Used) à savoir l'élément le moins récemment accédé. 
+Pour des raisons d'implémentations, il existe des versions plus simples censées approximer un 
+comportement de LRU dénommée PLRU pour Pseudo-LRU. On décrira cette stratégie un peu plus loin, 
+avec quelques autres, quand il s'agira de les émuler. Ces bases suffiront pour le moment.
+\section{}
 \bibliographystyle{plain} 
 \bibliography{report}
 \end{document}

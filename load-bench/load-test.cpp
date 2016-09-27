@@ -453,6 +453,7 @@ void * handler_slw(void * arg)
 #ifdef USE_AVX
 	load_asm(args->t, args->size, args->niter);
 #else
+	load_asm_sse(args->t, args->size, args->niter);
 #endif
 	//load_asm(args->t, args->size, args->niter);
 	time = mysecond() - time;
@@ -624,14 +625,14 @@ void load_asm_sse(double const * t, intptr_t n, intptr_t k)
 
 			"1:;"
 			//vload from memory
-			"vmovapd (%2, %%rax, 8), %%xmm0;"
-			"vmovapd 16(%2, %%rax, 8), %%xmm4;"
-			"vmovapd 32(%2, %%rax, 8), %%xmm1;"
-			"vmovapd 48(%2, %%rax, 8), %%xmm5;"
-			"vmovapd 64(%2, %%rax, 8), %%xmm2;"
-			"vmovapd 80(%2, %%rax, 8), %%xmm6;"
-			"vmovapd 96(%2, %%rax, 8), %%xmm3;"
-			"vmovapd 112(%2, %%rax, 8), %%xmm7;"
+			"movapd (%2, %%rax, 8), %%xmm0;"
+			"movapd 16(%2, %%rax, 8), %%xmm4;"
+			"movapd 32(%2, %%rax, 8), %%xmm1;"
+			"movapd 48(%2, %%rax, 8), %%xmm5;"
+			"movapd 64(%2, %%rax, 8), %%xmm2;"
+			"movapd 80(%2, %%rax, 8), %%xmm6;"
+			"movapd 96(%2, %%rax, 8), %%xmm3;"
+			"movapd 112(%2, %%rax, 8), %%xmm7;"
 			//increment vload counter
 			//"addq $1, %%rcx;"
 			//increment and compare
