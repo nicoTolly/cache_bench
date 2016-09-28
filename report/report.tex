@@ -14,7 +14,12 @@
 \usepackage{mathtools}
 \usepackage{amsthm}
 
+\usepackage{float}
+
 \usepackage[french]{babel}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows}
 
 \usepackage{color}
 \usepackage{listings}
@@ -37,6 +42,17 @@ breakatwhitespace=false,    % sets if automatic breaks should only happen at whi
 escapeinside={\%*}{*)}          % if you want to add a comment within your code
 }
 
+\usepackage[toc,page]{appendix}
+\tikzset{
+  treenode/.style = {align=center, inner sep=0pt, text centered,
+    font=\sffamily},
+  arn_w/.style = {treenode, circle, black, font=\sffamily\bfseries, draw=black,
+     text width=1.5em},
+  arn_r/.style = {treenode, circle, red, draw=black, 
+    text width=1.5em, very thick},% arbre rouge noir, noeud rouge
+  arn_x/.style = {treenode, rectangle, draw=black,
+    minimum width=2.5em, minimum height=2.5em}% arbre rouge noir, nil
+}
 
 %\singlespacing 
 %\onehalfspacing 
@@ -769,7 +785,7 @@ de support sur lesquels les tâches s'exécuteront. Cependant, on ne peut savoir
 et donc sur quel coeur les tâches seront exécutées.
 \\Décrivons un peu mieux ce fonctionnement. On a déjà décrit le processus d'outlining qui permet au
 runtime de récupérer le code à paralléliser isolé par le compilateur. Ces fonctions outlinées 
-représentent les tâches qui devront être exécutés par les différents threads. Au moment du premier
+représentent les tâches qui devront être exécutées par les différents threads. Au moment du premier
 appel au runtime, le premier thread va créer plusieurs autres threads et éventuellement les placer
 sur différents coeurs si cela a été demandé. Chaque thread maintient une file de tâche qu'il va
 exécuter au fur et à mesure. La file est initialement vide pour tout le monde. Le premier thread
@@ -1347,6 +1363,7 @@ atteindront respectivement des débits de 10GB/s et 2GB/s respectivement, soit u
 de 80\%. Aucune perte n'est par contre observable si les threads chargent significativement 
 moins de 20 mebioctets.
 \subsection{Partage des ressources}
+\label{subsec:ressources}
 J'ai fait tourner mon benchmark, pour différents nombres de threads (dans la limite du nombre de coeurs
 partageant un cache) et avec une taille de tableau croissante. Dans un premier temps, chaque thread 
 réalise exactement le même travail. Les graphiques \ref{fig:idchbench} et \ref{fig:dracbench} 
@@ -1457,7 +1474,7 @@ simplement de choisir le LRU (Least Recently Used) à savoir l'élément le moin
 Pour des raisons d'implémentations, il existe des versions plus simples censées approximer un 
 comportement de LRU dénommée PLRU pour Pseudo-LRU. On décrira cette stratégie un peu plus loin, 
 avec quelques autres, quand il s'agira de les émuler. Ces bases suffiront pour le moment.
-\section{Première tentative}
+\section{Premières tentatives}
 Le problème de la politique de remplacement est que son implémentation n'est pas rendu publique
 par les constructeurs et notamment par Intel. Dans un premier temps, l'hypothèse a été faite
 que l'architecture suivait peu ou prou une politique LRU, qui est certainement la plus répandue
@@ -1478,6 +1495,7 @@ bande-passante. Restait à formaliser cette intuition plus convenablement.
 \\J'ai formulé une première prévision pratique. Toujours en supposant une politique LRU, on
 peut affirmer la chose suivante : 
 \newtheorem{th1}{Théorème}
+\newtheorem{th2}{Théorème}
 \begin{th1}
 Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
 accèdent respectivement. Pour tout thread i, si $T_i$ est inférieur à $\frac{C}{N}$, où C est la 
@@ -1487,7 +1505,952 @@ Pour la preuve, on fait aussi l'hypothèse que, comme dans notre benchmark, l'ac
 est linéaire et boucle sur lui-même. C'est une hypothèse forte mais elle permet d'avoir une 
 bonne idée du moment où une donnée va être réaccédée, ce qui autorise une réflexion plus formelle.
 On espère simplement que les résultats obtenus pourront être au moins qualitativement pertinents
-pour d'autres types d'accès.
+pour d'autres types d'accès. On suppose aussi que toutes les tâches ne font que des accès mémoire
+(pas de travail ou de calcul annexe). 
+\begin{proof}
+Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
+accèdent respectivement. Soit C la taille du cache. On va supposer que :
+$\forall i, T_{i} < T_{i+1}$
+On définit ici le concept de distance de réutilisation pour une donnée. Il s'agit, pour une 
+donnée d, du nombre de données qui ont été accédées par tout le monde entre deux accès successifs
+à d. On va noter $\Delta(d)$ = distance de réutilisation de d, et $\delta_{i}(t)$ le nombre de 
+données accédées par le thread i entre deux accès à d.
+Comme on a fait l'hypothèse que le cache fonctionne en pur PLRU, alors la question est de
+savoir si $\Delta(d) < C$. Si oui d se trouve dans le cache, sinon il a été évicté.
+\\Soit i tel que $T_i \leq \frac{C}{N}$. Soit t une donnée accédée par i.
+On a $\forall j \leq i, T_{j} \leq T_{i} \leq \frac{C}{N}$.  On peut en déduire que $\forall j < i, 
+\delta_{j}(t) \geq \frac{C}{N}$.
+D'autre part, si un thread accède à plus de données qu'un autre, il a plus de chance de faire
+des miss et va donc au moins aussi lentement.
+Donc pour $k > i$, comme ${T_{k}}\geq{T_{i}}$, on peut affirmer que $\delta_k(t)\leq \frac{C}{N}$.
+\\Dès lors, on a : $\Delta(t) = \sum_{j=1}^{N} {\delta_{j}(t)} \leq \sum_{j=1}^{i-1}{\frac{C}{N}} + 
+T_i + \sum_{k=i+1}^{N}{\frac{C}{N}} \leq N * \frac{C}{N} $.
+\\Donc $\Delta(t) \leq C$. On a prouvé que le thread i trouve toujours ses données dans le cache.
+\end{proof}
+On sait que l'hypothèse de LRU est forte ne serait-ce que parce que le cache n'est pas totalement
+associatif. Néanmoins, si on suppose une politique LRU à l'intérieur d'un set, alors on peut 
+légitimement supposer qu'un comportement similaire sera adopté sur l'ensemble des données si 
+les sets sont remplis uniformément.
+\\J'ai cherché à vérifier expérimentalement cette règle. Pour cela, j'ai fait tourner mon
+programme sur idchire avec les paramètres suivants : un thread chargeant des données de plus
+en plus large fait des lectures. On fait tourner en parallèle un autre thread qui charge lui 
+des données beaucoup plus grande (plusieurs fois la taille du cache) puis deux autres, puis 
+trois, etc. et on regarde les performances du premier thread. Les résultats sur Dracula
+et Idchire sont présentés en figure \ref{fig:dracasbench} et \ref{fig:idchasbench}. 
+\\La loi n'est pas parfaitement suivie, notamment sur Dracula, mais on voit néanmoins qu'elle
+décrit correctement le comportement des threads au moins d'un point de vue qualitatif. Cependant,
+elle n'est pas très satisfaisante parce qu'elle ne décrit qu'un cas particulier. On aimerait
+pouvoir intégrer des situations plus générales dans le modèle.
+\begin{figure}[H]
+  \includegraphics[width=\linewidth]{bw-asym-idchire.pdf}
+  \label{fig:idchasbench}
+\end{figure}
+\begin{figure}[H]
+  \includegraphics[width=\linewidth]{bench-asym-dracula.pdf}
+  \label{fig:dracasbench}
+\end{figure}
+Nous avons ensuite essayé d'élargir le modèle en utilisant le même genre de principe. La
+proposition suivante vient de mon tuteur :
+\begin{th2}
+Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
+accèdent respectivement, triées par ordre croissant. Soit C la taille du cache. On note $B_c$ la 
+vitesse d'accès au cache et $B_m$ la vitesse d'accès à la mémoire principale. On affirme que :
+$\forall i$, si $\sum_{j=1}^{i}{T_{j}} + \frac{B_m}{B_C} * T_i * (N - i) \leq C$, alors le
+thread i ne subit pas de miss. Sinon, il est en full miss.
+\end{th2}
+
+Dans ce modèle, on va considérer que les threads sont soit en full miss, soit en full hits.
+En fait, on considère que la zone de transition est suffisamment petite pour être ignorée.
+\begin{proof}
+  On reprend les notations de l'énoncé, ainsi que celles de la démonstrations précédente sur
+  la distance de réutilisation.
+  Posons i tel que le thread i soit en full hits, et le thread i+1 en full miss. Soit d une 
+  donnée accédée par i. Exprimons $\Delta(d)$ en fonction de nos paramètres.
+\\  $\forall j \leq i$, on a $\delta_j(d) = T_j$ comme précédemment.
+ \\ $\forall k > i$, comme on a supposé que ces threads sont en full miss, et qu'on a posé
+ $B_m$ comme la vitesse d'accès en mémoire, $\delta_k(d)=B_m * t$, où t est le temps qui 
+ s'est déroulé entre deux accès successifs à d.
+ On a donc $\Delta(d)= \sum_{j=1}^{i}{T_j} + \sum_{k=i+1}^{N}{B_m * t} = \sum_{j=1}^{i}{T_j}
+ + B_m * t * (N - i)$
+ \\Maintenant, comme on a supposé que i était en full hits, il accède à ses données à une
+ vitesse $B_C$. Le temps de réaccéder à d est le temps qu'il met à accéder à toutes ses
+ données (on est toujours sur un accès linéaire), c'est-à-dire que $t= \frac{T_i}{B_C}$.
+ En réinjectant ce résultat dans la formule, on obtient :
+ \\ $\Delta(d)=  \sum_{j=1}^{i}{T_j} + \frac{B_m}{B_C} * (N - i) * T_i $
+ \\Et donc, si cette distance est inférieure à C, on a bien un thread en full hits dans
+ une hypothèse LRU. On vérifie sans problème que cette formule est croissante selon i. 
+ Donc en réalisant des essais successifs, on finit par distinguer les threads en full
+ miss et les threads en full hits. 
+\end{proof}
+Ce modèle s'est révélé moins probant au moment de l'expérimentation. L'hypothèse 
+que la zone de transition est négligeable est en fait trop forte : contrairement à
+un cache en pur LRU qui afficherait une rupture nette de performance au moment où
+les données dépassent la taille du cache (le programme passerait soudainement en 
+full miss) les bandes-passantes mesurées prennent toutes les valeurs possibles entre la 
+vitesse d'accès au cache et la vitesse d'accès à la mémoire principale. 
+\\Dans l'idée d'obtenir un modèle plus précis, j'ai voulu m'intéresser plus aux algorithmes
+de remplacement du cache.
+\section{Algorithmes de remplacement}
+Le problème principal ici est que les constructeurs ne donnent pas d'indications quant
+à la politique qu'ils implémentent pour une architecture particulière. On en est 
+réduit à faire des suppositions et à voir si les simulations correspondent aux
+résultats expérimentaux. Il faudrait voir, en premier lieu, quels algorithmes pourrait
+produire cette diminution continue de la bande-passante constatée empiriquement. On a déjà 
+dit, en effet, qu'un cache purement LRU entrainerait un effondrement soudain du temps
+d'accès, puisque dès l'instant où la taille des données dépasse la taille du cache, on 
+ne fait plus que des miss.
+\\Pour se donner une idée de la courbe qu'on peut attendre avec un cache, j'ai simulé
+quelques politiques différentes. J'ai essayé notamment avec un algorithme extrêmement
+naïf qui se contente de choisir une ligne à remplacer au hasard quand il doit rapatrier
+une donnée. Cet algorithme a l'avantage de présenter cette courbe lisse qui semble 
+s'approcher de la courbe rencontrée expérimentalement. Cela n'est cependant pas 
+satisfaisant, car cette politique est trop naïve pour pouvoir être implémenté dans
+la réalité. De plus, un cache qui se comporterait de cette manière n'exhiberait plus
+cette ``protection'' des threads accédant à des données peu nombreuses qu'on a 
+mise en évidence dans la partie précédente. En effet, dans cette configuration,
+toutes les données sont traitées à la même enseigne.
+\\On aurait pu imaginer un compromis entre une politique aléatoire et une politique
+LRU. Ainsi, j'ai essayé de simuler un ``Not recently Used'', un algorithme qui choisit
+la ligne victime aléatoirement parmi les lignes présentes en cache, exceptées celles 
+qui ont été accédées relativement récemment. Cependant, cette politique, si elle 
+permet de conserver la protection et la distinction entre les threads, exhibe une
+discontinuité corrélée à la taille de la ``fenêtre de protection''. En clair, on
+observe une chute brutale de la bande-passante quand les données dépassent la taille
+du cache, ce saut augmentant avec la fenêtre. C'est en fait logique, puisqu'un tel
+algorithme tend vers un simple LRU. 
+\\J'ai également implémenté un algorithme Pseudo-LRU tel qu'il est décrit dans ce 
+papier \cite{plru}. La LRU est ici approximée grâce à une structure en arbre. Chaque
+noeud est marqué par un bit qui permet de savoir où le cache doit chercher la 
+prochaine ligne à évicter. Quand le bit est à 0, le cache cherche dans l'arbre
+gauche, sinon il va dans l'arbre droit. Ainsi dans l'exemple suivant, la ligne
+marquée 2 sera la prochaine évictée.
+
+\begin{tikzpicture}[->,>=stealth',level/.style={sibling distance = 5cm/#1,
+  level distance = 1.5cm}] [label=tree1][H]
+  \centering
+\node [arn_w] {0}
+    child{ node [arn_w] {1} 
+            child{ node [arn_w] {0} 
+							child{ node [arn_x] {12}}
+							child{ node [arn_x] {15}}
+            }
+            child{ node [arn_w] {1}
+							child{ node [arn_x] {18}}
+							child{ node [arn_x] {2}}
+            }                            
+    }
+    child{ node [arn_w] {0}
+            child{ node [arn_w] {1} 
+							child{ node [arn_x] {23}}
+							child{ node [arn_x] {39}}
+            }
+            child{ node [arn_w] {0}
+							child{ node [arn_x] {49}}
+							child{ node [arn_x] {12}}
+            }
+		}
+; 
+\end{tikzpicture}
+
+Lorsqu'on accède à une ligne - soit pour la remplacer, soit pour la lire ou y écrire -
+on inverse tous les bits en remontant l'arbre. Ainsi, le remplacement de la ligne
+marquée 2 par une ligne marquée 6 renverrait un arbre dans l'état suivant : 
+\\\begin{tikzpicture}[->,>=stealth',level/.style={sibling distance = 5cm/#1,
+  level distance = 1.5cm}] [label=tree2][h]
+\node [arn_r] {1}
+    child{ node [arn_r] {0} 
+            child{ node [arn_w] {0} 
+							child{ node [arn_x] {12}}
+							child{ node [arn_x] {15}}
+            }
+            child{ node [arn_r] {0}
+							child{ node [arn_x] {18}}
+							child{ node [arn_x] {6}}
+            }                            
+    }
+    child{ node [arn_w] {0}
+            child{ node [arn_w] {1} 
+							child{ node [arn_x] {23}}
+							child{ node [arn_x] {39}}
+            }
+            child{ node [arn_w] {0}
+							child{ node [arn_x] {49}}
+							child{ node [arn_x] {12}}
+            }
+		}
+; 
+
+\end{tikzpicture}
+On se convainc facilement que cet algorithme a pour effet de protéger la dernière 
+donnée accédée. On peut imaginer des cas où ce n'est pas la donnée la plus ancienne
+qui est évictée : il suffit pour cela que cette donnée soit situé dans la même partie
+d'arbre que la donnée la plus récemment accédée. Néanmoins, cet algorithme semble
+bien émuler un comportement LRU suffisamment efficacement pour l'usage courant.
+\\J'ai voulu savoir si cette distinction pouvait expliquer l'écart de prévisions
+avec le LRU pur. Il n'en est rien : dans le cas de accès très linéaires, cet 
+algorithme se comporte très exactement comme un LRU. Il fallait donc chercher
+autre chose. 
+\\D'autres chercheurs ont essayé de reconstruire à partir de données empiriques
+les algorithmes de remplacement de diverses architectures. C'est le cas du travail
+présenté dans ce papier \cite{cachemodeling}. Décrire entièrement leur travail
+dépasse la portée de ce rapport, mais l'idée générale est de s'arranger pour 
+mettre le cache dans un état connu, puis de vérifier au bout de combien d'évictions
+une ligne se trouve remplacé. On obtient pas ainsi d'informations sur la technique
+d'implémentation du cache, mais le comportement se retrouve lui explicité. 
+Malheureusement, les auteurs n'ont semblent-ils pas mis leur code en ligne, ce
+qui m'a empêché de réaliser leurs tests sur mes architectures. Refaire leur 
+travail à partir de leur description me semblait trop compliqué et je manquais de 
+toute façon de temps. Néanmoins, les auteurs décrivent une politique de remplacement
+qu'ils n'ont pu réussir à décrypter et qui semble produire des résultats très
+similaires à ceux de mes architectures. Il s'agissait d'ailleurs d'architectures
+Intel Core 2 E6750 et E8400, donc x86 comme les miennes. Il semble donc bien 
+qu'Intel ait implémenté une stratégie plus complexes que ce qui est habituel sur
+les architectures de ces dernières années.
+\\Dans la mesure où les algorithmes de cache sont susceptibles de changer et qu'ils
+sont parfois difficile à déterminer sur une architecture donnée, nous avons
+voulu trouver un modèle qui ne reposerait pas sur une politique particulière.
+
+\section{Modèle à base empirique}
+Il serait donc intéressant de s'affranchir d'une politique de remplacement
+particulière dans notre modèle. De la sorte, on pourrait espérer construire des prédictions
+valables pour différentes architectures. L'idée serait de se baser sur une seule batterie
+de tests pour en retirer les informations nécessaires à la construction d'un modèle plus
+général. Dans notre cas, on aimerait se baser sur les résultats de bande-passante pour
+obtenu pour un seul thread pour tenter ensuite de l'extrapoler pour des situations 
+multithreadées et asymétriques. 
+\subsection{construction du modèle}
+Comment peut-on exploiter les données produites pour seulement un thread ? On va revenir
+ici à l'idée de distance de réutilisation. L'hypothèse essentielle que l'on va faire 
+pour ce modèle est que la probabilité de réaliser un miss sur une donnée est directement
+fonction de cette distance de réutilisation, donc de la quantité de données qui a été
+accédées et potentiellement rapatriée dans le cache. La vitesse d'accès est bien sûre
+directement liée au taux de miss d'un thread. Dès lors, on va considérer que cette 
+courbe représentant la vitesse de lecture en fonction de la taille des données d'un thread 
+que l'on possède avec nos tests représente la vitesse d'accès en fonction de la distance
+de réutilisation. C'est raisonnable dans la mesure où la distance de réutilisation
+pour un thread est connue et exactement égale à la taille des données accédées par le
+thread. Cela vient, encore une fois, de l'accès linéaire et cyclique que l'on fait sur
+nos données. Reste maintenant à exprimer la distance de réutilisation de chacun des threads sur la 
+base de cette hypothèse. Je l'ai exprimé récursivement de cette manière : 
+\newtheorem{th3}{Théorème}
+\begin{th3}
+Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
+accèdent respectivement en ordre croissant. On note $\Delta(i)$ la distance de réutilisation globale 
+d'une donnée accédée par le thread i,$\delta_i(j)$ la quantité de données accédées par un thread i
+pendant l'intervalle entre deux accès à une même donnée du thread j, f la fonction empirique censée 
+nous donner une vitesse d'accès en fonction d'une distance de réutilisation et $V_1, V_2 \cdots V_N$ 
+les vitesses d'accès respectives de chacun des threads. On a, par définition de f, $\forall 
+i, V_i = f(\Delta(i))$. Alors on dit que :
+\\$\Delta(N)= \sum_{i=1}^{N}{T_{i}}$
+\\Et pour un thread i quelconque, $\Delta(i)$ est solution de l'équation : 
+\\$\Delta(i)= \sum_{j=1}^{i}{T_{j}} + \sum_{k=i+1}^{N}{V_k} * \frac{T_i} {f(\Delta(i))}$
+\end{th3}
+On peut donc grâce à ces formules déduire récursivement une vitesse d'accès pour chaque thread en
+partant de la dernière. Voici le raisonnement :
+\begin{proof}
+  Le dernier thread étant nécessairement le plus lent et étant celui qui accède au plus de données,
+  on est certain que toutes les données ont été accédées par tous les threads pendant l'intervalle
+  de temps que lui a mis à accéder aux siennes. On a donc :
+  \\$\Delta(N) = \sum{T_i}$
+  \\Imaginons maintenant que l'on connaisse $\Delta(k)$ et donc $V_k$ pour k plus grand qu'un certain i.
+  On va essayer d'exprimer chacun des $\delta_j(i)$. D'abord, pour $j \leq i$, on est sûr que 
+  $\delta_j(i) = T_j$ puisque le thread j accède plus rapidement à moins de données que i. 
+  \\Voyons maintenant pour $k > i$. On connait la vitesse d'accès $V_k$ de k, on a donc
+  $\delta_k(i) = V_k * t_i $ où $t_i$ est l'intervalle de temps entre deux accès à une donnée de i.
+  Or, ce temps s'exprime comme ceci : $t = \frac{T_i}{V_i} $.
+  \\ Cette quantité est aussi égale à $\frac{T_i}{f(\Delta(i))}$ par définition de f.
+  \\Finalement, on obtient : 
+  $\delta_k(i) = V_k * \frac{T_i}{f(\Delta(i))}$
+\\ Et en réinjectant ceci dans l'expression de $\Delta(i)$, on trouve : 
+\\  $\Delta(i) = \sum_{j=1}^{N}{\delta_j(i)} = \sum_{j=1}^{i}{T_j} + \sum_{k=i+1}^{N}{V_k} * \frac{T_i}{f(\Delta(i))}$
+\end{proof}
+
+Les équations étant basées sur une fonction empirique, elles ne sont pas résolvables analytiquement, 
+mais on peut par contre utiliser une méthode numérique pour trouver une solution approchée. J'ai 
+choisi d'utiliser une méthode de Newton, épaulée au besoin (quand on n'est pas capable de fournir 
+une valeur initiale de la solution) par une simple bisection. Pour cela, j'ai utilisé la 
+bibliothèque numpy de python. 
+\begin{lstlisting}[language=python]
+#take a reverse sorted thread sizes list and 
+#returns the list of corresponding bandwidths
+def calculate_cache(lThreads, lBw, data):
+#empirical continuous function from discrete datas
+    f = fromdata(data)
+    #if no more threads to treat, returns
+    if ( not lThreads):
+        return lBw
+    #first and biggest datas
+    elif (not lBw):
+        bw = f(sum(lThreads))
+        lBw.append(bw)
+        lThreads.pop(0)
+        return calculate_cache(lThreads, lBw, data)
+    else:
+        try:
+            thrsum = sum(lThreads)
+            lBwsum = sum(lBw)
+            def func(x):
+                return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
+            xopt = scipy.optimize.newton_krylov(func, thrsum, f_tol = 1.0)
+            lBw.append(f(xopt))
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw, data)
+        except ValueError:
+            # newton approximation can fail when bw is too big
+            # in this case we try to approach a solution
+            # by a bisection method
+            def func(x):
+                return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
+            xopt = bisect(func, lThreads[0], 2 * thrsum, 0)
+            lBw.append(f(xopt))
+            #bw = lBw[-1]
+            #lBw.append(bw)
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw, data)
+
+\end{lstlisting}
+Le code complet est trouvable en annexe. Voilà à quel point j'en étais à la fin de mon stage.
+Comme on va le voir, ce modèle souffre encore de grosses approximations qu'il aurait été intéressant
+d'essayer de résoudre.
+\subsection{limitations}
+Malheureusement, il m'a manqué du temps pour tester ce modèle extensivement. Il semble qu'il soit encore
+trop approximatif dans les cas critiques où la somme des données des threads s'approchent de la taille 
+du cache, et il est généralement trop optimiste. Remarquons tout de même qu'on retrouve les résultats
+de protection des threads chargeant peu de données, qui se retrouvent en full hits. Si l'on manque 
+encore de recul pour l'analyse, des failles peuvent clairement être mises en avant.
+\\La principale est que ce modèle tient la vitesse d'accès à la mémoire pour une constante, alors que 
+l'on a déjà vu dans la section \ref{subsec:ressources} que cette vitesse est dépendante du nombre 
+de threads qui tentent d'y accéder. 
+\\Ce modèle est donc conduit à surestimer la vitesse que peut espérer atteindre un thread qui doit
+ramener toutes ses données depuis la mémoire principale. Cela peut en partie expliquer la tendance
+à surestimer les valeurs des vitesses de notre modèle.
+\\J'ai cherché à améliorer la situation en utilisant également comme base les résultats empiriques
+provenant de plusieurs threads réalisant un travail symétrique. Les valeurs des vitesses d'accès à
+la mémoire principale étaient au moins correctes si l'on arrivait à deviner combien de threads 
+allaient se trouver en full miss. L'idée était de faire tourner plusieurs fois l'algorithme avec 
+les différentes données expérimentales jusqu'à trouver la prédiction la plus cohérente. Je vérifiais
+la cohérence de la manière suivante : quand j'utilisais par exemple les données générées avec
+trois threads, je vérifiais que l'on avait bien prédit que trois threads se retrouvaient en situation
+de full miss. Sinon, je recommençais avec une autre valeur. 
+\\Cette méthode ne semblait pas donner de bien meilleurs résultats. Il reste, il me semble, un problème
+fondamentale à ce modèle qui est le suivant : comment déterminer le partage de la bande-passante 
+depuis la mémoire principale quand certains threads font partiellement des miss et partiellement 
+des hits. Au point où j'en suis, il me semble qu'un modèle plus pointu devra apporter une réponse
+à ces questions.
+
+\chapter{Conclusion}
+J'ai donc présenté dans ce rapport l'ensemble de mes activités durant mes six mois de stage à l'Inria
+Grenoble. Sur un plan professionnel, je crois avoir réussi à faire profiter mon équipe de mes compétences,
+notamment grâce au travail réalisé sur le benchmark qui a été réutilisé par d'autres membres dans le cadre
+d'un travail annexe. Je trouve dommage de n'avoir pas pu aboutir sur le sujet de la prédiction de cache. 
+Il me semble néanmoins avoir exploré des pistes intéressantes, qui peuvent former une bonne
+base de réflexion à de futurs travaux.
+\\Sur un plan plus personnel, ces six mois m'ont permis de développer très largement mes connaissances et
+mes compétences. J'ai désormais une compréhension beaucoup plus pointue des sujets traitants notamment
+d'architectures bas niveau, de modèles mémoire, des problématiques de compilation ou des supports 
+d'exécution. J'ai aussi pu prendre de l'expérience en développement dans différents langages,
+essentiellement le python et le C++ ainsi que en ocaml. Plus que cela, j'ai pu découvrir le monde de la
+recherche et son fonctionnement, une expérience qui, je l'espère, me sera utile dans mon parcours 
+professionnel, et qui devrait être mise à profit très rapidement puisque je reviendrai travailler dans
+le laboratoire d'ici un mois, temporairement en tant qu'ingénieur. J'espère à l'avenir avoir l'occasion
+de pousser le processus de recherche jusqu'au bout et notamment jusqu'à la rédaction d'un article, ce
+que je n'ai pas eu l'occasion de faire ici. Ceci conclut donc ce rapport et mon stage de fin d'études.
 \bibliographystyle{plain} 
 \bibliography{report}
+\begin{appendices}
+  \chapter{Annexes}
+  \section{fonction main du benchmark de load, avec allocations et répartitions des threads}
+  \begin{lstlisting}
+
+int main(int argc, char ** argv)
+{
+	double * tab;
+	pthread_t * thrTab;
+	pthread_barrier_t bar;
+
+
+	int quantum;
+	int BytesPerWord;
+	long nb_iter;
+	unsigned long load_bytes;
+#ifdef USE_PADDING
+// We introduce some padding in data to see if 
+// something is changed
+	int var_padding = (1 << 25);
+#endif
+
+
+	//Parsing args and initializing param
+	//in order to get number of threads,
+	//slow threads, places, etc.
+	int ret = parseArg(argc, argv,  &param);
+	if (ret < 0)
+	{
+		printf("usage : ./load -n=<threads number> -slow=<number of slow threads> -size=<power of two> -ratio=<ratio slow size / fast size> -places=<core places| close | spread>\n");
+		exit(EXIT_FAILURE);
+	}
+	if (param == NULL)
+	{
+		cout << "param not allocated !!" << endl;
+		exit(EXIT_FAILURE);
+	}
+
+	param->info();
+	
+
+
+	printf(HLINE);
+	BytesPerWord = sizeof(double);
+	printf("This system uses %d bytes per DOUBLE PRECISION word.\n",
+			BytesPerWord);
+
+	printf(HLINE);
+
+	if  ( (quantum = checktick()) >= 1) 
+		printf("Your clock granularity/precision appears to be "
+				"%d microseconds.\n", quantum);
+	else
+		printf("Your clock granularity appears to be "
+				"less than one microsecond.\n");
+	
+	
+	//pinning main thread on cpu 0 (on a numa architecture, data could 
+	// be allocated on another node otherwise)
+	cpu_set_t sets;
+	CPU_ZERO(&sets);
+	CPU_SET(0, &sets);
+	int s = pthread_setaffinity_np(pthread_self(),sizeof(cpu_set_t), &sets);
+	if (s != 0)
+	{
+		printf("could not set affinity\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	
+
+
+	int nbFst = param->nbThread - param->nbSlow;
+	//initializing tab containing data to be loaded
+#if defined(__gnu_linux__) && defined(USE_HUGE) 
+	//using mmap for allocating hugepages
+	void * ptrvoid = mmap(NULL, (param->globsiz + 8) * sizeof(double), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | HUGE_MAP , -1, 0 );
+	if (ptrvoid == MAP_FAILED)
+	{
+		cout << "could not allocate tab with mmap" << endl;
+		exit(EXIT_FAILURE);
+	}
+	tab = (double *) ptrvoid;
+
+#else
+#ifdef USE_PADDING
+	//padding
+	tab = new double[param->globsiz + 8 + param->nbThread * var_padding];
+#else//USE_PADDING
+	tab = new double[param->globsiz + 8 ];
+#endif//USE_PADDING
+#endif //HUGE
+	if(tab == NULL)
+	{
+		cout << "could not allocate tab" << endl;
+		exit(EXIT_FAILURE);
+	}
+	//storing old value for freeing
+	double * oldtab = tab;
+	//aligning on 32 bytes for intrinsics and
+	//assembly constraint
+	tab = (double *)align_ptr((char *)tab, 32);
+#pragma omp for
+	for (size_t i = 0; i <  param->globsiz; i++)
+	{
+		tab[i]= 3.4;
+	}
+
+	printf(HLINE);
+	print_status();
+	printf(HLINE);
+	
+
+	// getting number of iterations, we want to do approximately 2^25 cycles
+
+	long * iter = NULL;
+	load_bytes = 0;
+	if (param->thrSizes != NULL)
+	{
+		iter = get_tab_iter(param->thrSizes, param->nbThread);
+		nb_iter = 0;
+		for (int i = 0; i < param->nbThread; i++)
+		{
+			//nb_iter += iter[i] ;
+			load_bytes += iter[i] * param->thrSizes[i] * sizeof(double); 
+		}
+		nb_iter = array_sum(iter, param->nbThread);
+}
+	else
+	{
+		nb_iter = get_nb_iter(param->globsiz);
+		load_bytes = nb_iter * param->globsiz;
+	}
+
+
+	long bytes = param->globsiz * sizeof(double);
+	printf(HLINE);
+	printf("N = %ld, %d threads will be called, loading %d%c bytes of data \n", param->globsiz, param->nbThread, siz(bytes), units(bytes));
+	printf(HLINE);
+
+
+
+	// array that will contain pthread identifiers
+	thrTab = (pthread_t *)malloc(param->nbThread * sizeof(pthread_t));
+	
+	*thrTab= pthread_self();
+	// we don't want threads to start loading before having been
+	// pinned, so we put a barrier
+	pthread_barrier_init(&bar, NULL, param->nbThread);
+	args_t hargs[param->nbThread];
+
+	//array for timestamp (in order to get global throughput
+	// at the end)
+	double *times = new double[param->nbThread];
+	unsigned long *cycles = new unsigned long[param->nbThread];
+	
+
+
+	if (param->thrSizes == NULL)
+	{
+
+
+		int i;
+		// this offset will be incremented by the size
+		// of the array we want our thread to work on
+		intptr_t offset = 0;
+		if (param->nbSlow == param->nbThread)
+			offset += param->ssiz;
+		else
+			offset += param->fsiz;
+
+		for(i = 1; i < nbFst; i++)
+		{
+			//address of data start for this thread
+#ifdef USE_PADDING
+			hargs[i].t = tab + offset + var_padding;
+#else//USE_PADDING
+			hargs[i].t = tab + offset ;
+#endif//USE_PADDING
+			hargs[i].bar = &bar; 
+			hargs[i].size = param->fsiz; 
+			hargs[i].niter = nb_iter; 
+			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
+			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
+			offset +=  param->fsiz;
+		}
+
+		for(; i < param->nbThread; i++)
+		{
+			hargs[i].t = tab + offset;
+			hargs[i].bar = &bar; 
+			hargs[i].size = param->ssiz; 
+			hargs[i].niter = nb_iter; 
+			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
+			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
+			offset +=  param->ssiz;
+		}
+
+	}
+	// thrSizes is set
+	// user has entered data sizes
+	else
+	{
+		intptr_t offset = param->thrSizes[0];
+		int i;
+		for( i = 1; i < nbFst; i++)
+		{
+			//padding with adding_var doubles
+			hargs[i].t = tab + offset ;
+			hargs[i].bar = &bar; 
+			hargs[i].size = param->thrSizes[i]; 
+			//hargs[i].niter = nb_iter; 
+			hargs[i].niter = iter[i]; 
+			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
+			pthread_create(thrTab + (intptr_t)i, NULL, handler, (void *) &hargs[i]);
+			offset +=  param->thrSizes[i];
+		}
+		for(; i < param->nbThread; i++)
+		{
+			//padding with adding_var doubles
+			hargs[i].t = tab + offset ;
+			hargs[i].bar = &bar; 
+			hargs[i].size = param->thrSizes[i]; 
+			//hargs[i].niter = nb_iter; 
+			hargs[i].niter = iter[i]; 
+			hargs[i].time = times + i; 
+			hargs[i].cycle = cycles + i; 
+			pthread_create(thrTab + (intptr_t)i, NULL, handler_slw, (void *) &hargs[i]);
+			offset +=  param->thrSizes[i];
+		}
+	}
+
+
+
+	//Placing threads on appropriate cpu
+	//If either fstThrList or slwThrList
+	//is set to null, then it means that 
+	//all threads are either fast or slow
+	if (param->fstThrList != NULL)
+	{
+		int s;
+		cpu_set_t sets[nbFst];
+		for (int k = 0; k < nbFst; k++)
+		{
+			CPU_ZERO(&sets[k]);
+			CPU_SET(param->fstThrList[k], &sets[k]);
+			printf("fast thread [%d] pinned on cpu %d\n", k, param->fstThrList[k]);
+			s = pthread_setaffinity_np(thrTab[k],sizeof(cpu_set_t), &sets[k]);
+			if (s != 0)
+			{
+				printf("could not set affinity\n");
+				exit(EXIT_FAILURE);
+			}
+		}
+		
+	}
+
+	if (param->slwThrList != NULL)
+	{
+		int s;
+		cpu_set_t sets[param->nbSlow];
+		for (int k = 0; k < param->nbSlow; k++)
+		{
+			CPU_ZERO(&sets[k]);
+			CPU_SET(param->slwThrList[k], &sets[k]);
+			s = pthread_setaffinity_np(thrTab[nbFst + k],sizeof(cpu_set_t), &sets[k]);
+			if (s != 0)
+			{
+				printf("could not set affinity\n");
+				exit(EXIT_FAILURE);
+			}
+			printf("Slow thread [%d] pinned on cpu %d\n", k, param->slwThrList[k]);
+		}
+
+	}
+
+
+	// launching main thread
+	// slow threads if there is 
+	// no fast thread
+	// fast thread otherwise
+	hargs[0].t = tab ;
+	hargs[0].bar = &bar; 
+	//hargs[0].niter = nb_iter; 
+	if (iter != NULL)
+		hargs[0].niter = iter[0]; 
+	else
+		hargs[0].niter = nb_iter; 
+	hargs[0].time = times ; 
+	hargs[0].cycle = cycles; 
+	if (param->thrSizes == NULL)
+	{
+		if(param->nbThread == param->nbSlow)
+		{
+			hargs[0].size = param->ssiz; 
+			handler_slw((void *)&hargs[0]);
+		}
+		else
+		{
+			hargs[0].size = param->fsiz; 
+			handler((void *)&hargs[0]);
+		}
+	}
+	//case user had entered thread sizes as inputs
+	else
+	{
+		hargs[0].size = param->thrSizes[0];
+		if(param->nbThread == param->nbSlow)
+			handler_slw((void *)&hargs[0]);
+		else
+			handler((void *)&hargs[0]);
+			
+
+	}
+
+
+	for (int k = 0; k < param->nbThread; k++)
+		pthread_join(thrTab[k], NULL);
+	
+	double maxtime = *(std::max_element(times, times + param->nbThread));
+	unsigned long maxcycle = *(std::max_element(cycles, cycles + param->nbThread));
+
+	//double ld = sizeof(double) * param->globsiz * nb_iter ;
+	printf("Global throughput : %f %cB/s\n", siz_d(load_bytes / maxtime), units_d(load_bytes / maxtime));
+	printf("Global bytes per cycle : %f %cB/c\n", siz_d(load_bytes / maxcycle), units_d(load_bytes / maxcycle));
+	printf("Estimated frequency : %f %cHz\n", siz_d(maxcycle / maxtime), units_d(maxcycle / maxtime));
+
+	//free param
+	delete[] times;
+	delete[] cycles;
+	free(thrTab);
+#if defined(__gnu_linux__) && defined(USE_HUGE) 
+	munmap((void *)oldtab, ((param->globsiz + 8) * sizeof(double) ));
+	//munmap((void *)oldtab, std::min((size_t)(1 << 27), ((param->globsiz + 8) * sizeof(double))));
+#else
+	free(oldtab);
+#endif
+	delete param;
+	return 0;
+}
+  \end{lstlisting}
+  \section{programme Ocaml de simulation d'accès cache}
+\begin{lstlisting}[language=caml]
+open Array
+open Printf
+
+module type Cache = sig
+  type  t
+  val initSimpleTree : int ->  t
+  val insertVal : int -> float ->  t ->  t   
+  val getValAtCache : int ->  t ->  t * float option
+end
+
+  (*Look for a variable, first in cache, then in memory in case of miss
+   * insert new value in cache in case of miss
+   * returns a boolean, the searched value and the new cache
+   * The boolean is true in case of hit, false in case of miss
+   * *)
+let getValAt addr tree arr = 
+  let newTree, res = PLRU.getValAtCache addr tree  in  match  res with
+    | None -> false, arr.(addr), PLRU.insertVal addr arr.(addr) newTree
+    | Some v -> true, v, newTree
+
+    (*loop and emulate load niter times
+     * *)
+let rec loop niter arr = 
+  let rec inter it arr cache acc = 
+  if (it < niter) then 
+    ((* let plru = (module PLRU : Cache) in *)
+      let hit, res, newCache = getValAt (it mod (Array.length arr)) cache arr  in 
+      if (hit) then 
+        inter (it + 1) arr newCache (acc + 1)
+      else
+        inter (it + 1) arr newCache acc 
+    )
+  else
+    acc
+  in
+  let cache = PLRU.initSimpleTree 5 in
+  inter 0 arr cache 0;;
+
+
+let () = 
+  Random.self_init ();
+  let arrlen = if (Array.length Sys.argv > 1) then int_of_string (Sys.argv.(1)) else 100 in
+  let  memArray = Array.make arrlen 0.0 in
+    for i = 0 to (Array.length memArray - 1) do memArray.(i) <- (float_of_int i) done;
+  (*let cache = PLRU.initSimpleTree 5 in*)
+  printf "%d hits \n" (loop 10000 memArray ) 
+
+
+
+
+
+\end{lstlisting}
+\section{Programme Ocaml de simulation de PLRU }
+\begin{lstlisting}[language=caml]
+
+type  'a t = Node of bool *  'a t *  'a t | Leaf of (int * 'a) option 
+
+
+  (* simple balanced binary tree *)
+  (*
+let rec initSimpleTree hght = 
+  if (hght == 0) then Leaf None else Node(true, initSimpleTree (hght - 1), initSimpleTree (hght - 1))
+  *)
+
+let rec initSimpleTree hght = 
+  if (hght == 0) then Leaf None else 
+    ( if (hght mod 2 == 0 ) then  Node(true, initSimpleTree (hght - 1), initSimpleTree (hght - 1))
+    else Node(false, initSimpleTree (hght - 1), initSimpleTree (hght - 1))
+    )
+
+(*search for a value in cache, return Some if success, None if fail*)
+let rec getValAtCache addr t = match t with
+  | Node(b, left, right) -> 
+      (let treeLeft, resLeft = getValAtCache addr left and treeRight, resRight= getValAtCache addr right in
+      match (resLeft, resRight) with 
+    | Some a, _ -> Node(false, treeLeft, treeRight), Some a 
+    | None, Some b -> Node(true, treeLeft, treeRight), Some b
+    | None, None -> Node(b, treeLeft, treeRight), None
+    )
+  | Leaf(Some(a, v)) when (a == addr) -> t, Some v
+  | Leaf _ -> t, None
+
+  (*insert val in cache in case of miss*)
+let rec insertVal addr v tree =  match tree with
+  | Leaf(_) -> Leaf(Some(addr, v))
+  | Node(true, ltree, rtree) ->  Node(false, insertVal addr v ltree, rtree )
+  | Node(false, ltree, rtree) ->  Node(true,  ltree, insertVal addr v rtree )
+\end{lstlisting}
+  script python d'estimation des vitesses d'accès.
+\begin{lstlisting}[language=python]
+#!/usr/bin/env python3
+import scipy.optimize
+import numpy
+import re
+import sys
+from random import randint
+
+#input_name = "data-dracula.txt"
+# datas from dracula benchmarks
+input_name = "results1.txt"
+input_name2 = "results2.txt"
+input_name3 = "results3.txt"
+input_name4 = "results4.txt"
+
+class NoArgException(Exception):
+    pass
+
+# get a continuous and differentiable function
+# from a data set
+# not used in the code
+def femp_interpol(datak, datav):
+    coeff = numpy.polyfit(datak, datav, len(datak) - 1)
+    diccoeff = [(i, coeff[len(datak) - i - 1]) for i in range(len(coeff))]
+    def inter(x):
+        return sum([ pow(x, i) * v for (i, v) in diccoeff])
+    return inter
+
+# this function takes a float and a sets of data
+# approximate the value for input x by simply linking points
+def femp(x, data):
+    xint = int(x)
+    sorted_keys = sorted(data.keys())
+    fkey  = sorted_keys[0]
+    skey  =  sorted_keys[1]
+    lkey = sorted_keys[-1]
+    if (xint < fkey):
+        return data[fkey]
+    if(xint > lkey):
+        return data[lkey]
+    #print("keys : {} {}\n".format(fkey , skey))
+    # difference between two consecutives points
+    delta = skey - fkey
+    base = fkey
+    x_rounded = (((xint - base) // delta ) * delta) + base
+    lbda = (x - x_rounded ) / float(delta)
+    bwx = (1 - lbda) * data[x_rounded] + lbda * data[x_rounded + delta]
+    return bwx
+
+# approximate a zero with a bisection
+# less efficient than newton, used as a plan B
+def bisect(f, x1, x2, n):
+    if (( abs(x1 - x2) < 0.0001) or ( n > 10000) or (abs(f(x1)) < 0.001)):
+        return x1
+    if( f(x1) * f(x2) < 0 ):
+        y3 = f( (x1 + x2) / 2)
+        if (y3 * f(x1) < 0):
+            return bisect(f, x1, (x1 + x2) / 2, n + 1)
+        else:
+            return bisect(f, (x1 + x2) / 2, x2, n + 1)
+    else:
+        #case initial points happen to be of same sign
+        if (randint(0, 100) < 50) :
+            return bisect(f,x1 + x2, 2 * x2, n + 1)
+        else:
+            return bisect(f,x1 / 2, x2  / 2, n + 1)
+
+# ask user for thread sizes input
+# can be passed in standard input (supports EOF
+# for terminating
+def get_threads():
+    tab=[]
+    print("Enter data size for each threads, press <Return> when finished")
+    s = sys.stdin.readline()
+    while(s and (not re.match('^$', s))):
+        s = s.strip()
+        try:
+            tab.append(int(s))
+        except ValueError:
+            print("Enter number")
+        s = sys.stdin.readline()
+            
+    print(tab)
+    return tab
+
+
+
+
+#get a function femp based on data passed as parameters
+def fromdata(test):
+    return lambda x: femp(x, test)
+
+# returns the derivative of the function passed as parameters
+# 
+def derivate(f, delta):
+    def func(x0) :  
+         return ((f(x0 + delta) - f(x0)) / float(delta))
+    return  func
+
+#take a reverse sorted thread sizes list and 
+#returns the list of corresponding bandwidths
+def calculate_cache(lThreads, lBw, data):
+    f = fromdata(data)
+    if ( not lThreads):
+        return lBw
+    elif (not lBw):
+        bw = f(sum(lThreads))
+        lBw.append(bw)
+        lThreads.pop(0)
+        return calculate_cache(lThreads, lBw, data)
+    else:
+        try:
+            thrsum = sum(lThreads)
+            lBwsum = sum(lBw)
+            def func(x):
+                return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
+            xopt = scipy.optimize.newton_krylov(func, thrsum, f_tol = 1.0)
+            lBw.append(f(xopt))
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw, data)
+        except ValueError:
+            # newton approximation can fail when bw is too big
+            # in this case we try to approach a solution
+            # by a bisection method
+            def func(x):
+                return (f(x) * (x - thrsum) - (sum(lBw))*lThreads[0])
+            xopt = bisect(func, lThreads[0], 2 * thrsum, 0)
+            lBw.append(f(xopt))
+            #bw = lBw[-1]
+            #lBw.append(bw)
+            lThreads.pop(0)
+            return calculate_cache(lThreads, lBw, data)
+
+
+
+try:
+    datafile = sys.argv[1]
+except:
+    raise NoArgException("you must give a data file as input")
+
+with open(datafile, "r") as dataf:
+    line = dataf.readline()
+    datakeys = []
+    dataval = []
+    data = dict()
+    # retrieve data from files
+    while(line ):
+        l = line.split()
+        data[int(l[0])]= float(l[1])
+        datakeys.append(int(l[0]))
+        dataval.append(float(l[1]))
+        line = dataf.readline()
+
+
+thrlist = get_threads()
+# we want to iterate on threads in
+# decreasing order 
+tabThr = sorted(thrlist, reverse=True)
+lBw = calculate_cache(tabThr, [], data)
+\end{lstlisting}
+\end{appendices}
 \end{document}
