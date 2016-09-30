@@ -17,7 +17,6 @@
 \usepackage{float}
 
 \usepackage[french]{babel}
-
 \usepackage{tikz}
 \usetikzlibrary{arrows}
 
@@ -66,16 +65,21 @@ dans un programme multitâches}
 \maketitle
 \tableofcontents
 
-
+\chapter{Remerciements}
+Je tiens à remercier ici mes deux tuteurs, Florent Bouchez-Tichadou et Fabrice Rastello, d'abord pour avoir 
+accepté de m'intégrer au sein du laboratoire, mais aussi et surtout pour l'aide, les encouragements et le
+soutien constants qu'ils m'ont prodigués durant ces six mois. Je veux aussi adresser un mot à tous mes 
+camarades d'équipe avec qui j'ai passé de très bons moments et qui ont contribué à faire de ce stage
+une belle expérience.
 
 
 \chapter{Introduction}
 Ce document rapporte mon activité durant le stage de fin d'études que j'ai 
-realisé a l'Inria, l'Institut National de Recherche en Informatique et
+réalisé a l'Inria, l'Institut National de Recherche en Informatique et
 Automatique, au sein de l'équipe CORSE (Compilation and Optimisation in Runtime).
 J'ai donc eu affaires naturellement à des problématiques de recherche mais aussi à
 des problématiques d'ingénierie tout au long de ces six mois. Plus précisément, mes travaux ont été
-liées à des problématiques de programmation concurrente et multithreadée. Il s'est agi au départ d'évaluer
+liés à des problématiques de programmation concurrente et multithreadée. Il s'est agi au départ d'évaluer
 le comportement et le partage des ressources sur des architectures dites NUMA, Non-Uniform Memory Access. 
 La problématique a ensuite évolué, pour des raisons que l'on verra, vers des questions de partage de cache
 entre différents threads.
@@ -87,10 +91,9 @@ des prédictions quant aux comportements des threads en concurrence.
 Plusieurs pistes et modèles ont été explorés, certains résistant mieux que d'autres aux vérifications 
 expérimentales.
 Après avoir rappelé le contexte du stage, le statut de l'INRIA, les thèmes de travail de l'équipe CORSE où
-j'ai été intégré, nous allons voir en détail toutes les étapes qui ont été rencontrées au cours de ce stage. 
-Nous remettrons ensuite en perspective ces travaux et l'intérêt qu'ils peuvent représenter dans les 
+j'ai été intégré, nous allons voir en détail toutes les étapes qui ont été rencontrées au cours de ce stage, 
+en essayant de remettre en perspective ces travaux et l'intérêt qu'ils peuvent représenter dans les 
 domaines traités par l'équipe.
-
 \chapter{Le contexte}
 \section{L'entreprise}
 
@@ -98,7 +101,7 @@ Inria est l'Institut National de Recherche en Informatique et Automatique. Cré�
 d'établissement à caractère scientifique et technologique. Sa mission est de coordonner la recherche dans 
 les domaines liés à l'informatique au niveau national. Il promeut, comme on peut le trouver sur le site officiel,
 l'excellence scientifique au service du transfert technologique et de la société.
-\\ Depuis sa création, Inria a développé de nombreux projets scientifques qui font jusqu'à aujourd'hui 
+\\ Depuis sa création, Inria a développé de nombreux projets scientifiques qui font jusqu'à aujourd'hui 
 sa réputation.  On peut citer, parmi les projets les plus connus , ses travaux sur les développements 
 d'internet, les langages de programmations Caml, Caml Light et Ocaml , le logiciel de calcul scientifique 
 Scilab, l'assistant de preuve Coq ou la bibliothèque de calcul flottant en haute précision GNU MPFR.
@@ -110,7 +113,7 @@ projets Ocaml, Coq, Scilab ou GNU MPFR sont tous déposés sous licence libre, s
 licence GNU GPL, soit sous la licence compatible créée par Inria en collaboration avec le CEA et le CNRS
  CeCILL (CEA CNRS Inria Logiciel Libre). La bibliothèque MPFR (Multiple Precision Floating Point Reliably)
  est d'ailleurs utilisée dans le célèbre compilateur GNU GCC (GNU Compiler Collection).
-\\ Les effectifs de l'Inria sont organisées en de nombreuses équipes constituées en moyenne d'une vingtaine
+\\ Les effectifs de l'Inria sont organisés en de nombreuses équipes constituées en moyenne d'une vingtaine
  de personnes (membres permanents ou non-permanents), accueillant à l'occasion (ou même de manière continue)
 des chercheurs dépendants d'autres institutions. Les équipes sont à leur tour réparties sur huit centres 
 autonomes dispersés sur tout le territoire métropolitain. C'est dans l'une de ces équipes que j'ai réalisé
@@ -128,7 +131,7 @@ du runtime (donc de l'exécution).
 \\ La conception et les perspectives des architectures matérielles ont beaucoup évolué dans les 
 quinze dernières années.  Des tout débuts de l'informatique jusqu'au début des années 2000 
 environ, les différents processeurs et composants ont eu tendance à converger et à se faire de
-plus en plus puissantes (on parle ici de fréquence des processeurs et de nombres d'instructions 
+plus en plus puissants (on parle ici de fréquence des processeurs et de nombres d'instructions 
 par seconde). On imaginait généralement que cette évolution se poursuivrait et que conséquemment, 
 un même programme pourrait être exécuté plus rapidement dès lors qu'on le ferait tourner sur une 
 nouvelle architecture. Les années 2000 ont mis fin à cette croyance lorsque des problématiques 
@@ -165,7 +168,7 @@ permettant de tirer le meilleur parti d'architectures très différentes à part
 selon des métriques qui peuvent également varier avec la situation. Il s'agit généralement d'améliorer 
 la performance en temps, en espace mémoire et/ou en énergie.
 \\ Pour cela, l'équipe développe, pour une part, des stratégies dynamiques où les décisions sont prises au
-moment de l'exécution réelle du programme sur une machine. Ces décisions peuvent concerner l'équilibrage
+moment de l'exécution du programme sur une machine. Ces décisions peuvent concerner l'équilibrage
 des charges, la répartition des tâches sur différents processeurs, etc.
 \\Pour une autre part, l'équipe développe aussi des stratégies statiques, dans lesquelles les décisions
 sont prises au moment de la compilation du programme. De nombreuses optimisations peuvent être réalisées
@@ -194,7 +197,7 @@ de l'équipe, le choix de s'intéresser à la technologie OpenMP était relative
 Ma mission était initialement liée à la technologie OpenMP. OpenMP est une interface de programmation
 disponible pour les langages C, C++ et Fortran qui permet de faciliter grandement l'écriture de programmes
 parallèles. Comme nous allons le voir, elle fait intervenir à la fois des techniques de compilation et des
-techniques dynamique, ce qui la place au coeur des thèmes de l'équipe. L'idée était d'étudier le 
+techniques dynamiques, ce qui la place au coeur des thèmes de l'équipe. L'idée était d'étudier le comportement
 d'applications utilisant OpenMP sur des architectures particulières. Les machines ciblées étaient de type
 Non Uniform Memory Architecture. Cela signifie que si chaque processeur a accès à toute la mémoire de la
 machine, il a néanmoins un accès privilégié à une certaine portion de cette mémoire (on parle de noeud) et
@@ -211,7 +214,7 @@ Nous allons donc maintenant :
 OpenMP signifie Open Multi-Processing. Il s'agit, comme nous l'avons précisé précédemment, d'une interface 
 de programmation pour les langages C, C++ et Fortran. OpenMP est géré par un consortium, the OpenMP 
 Architecture Review Board. Plus précisément, ce consortium produit une spécification d'OpenMP, donc une 
-liste des comportements et des options auquels un utilisateur peut s'attendre en utilisant OpenMP.
+liste des comportements et des options auquels un utilisateur peut s'attendre en utilisant OpenMP\cite{ompspec}.
 \\Il existe ensuite différentes implémentations, qui pourront remplir en totalité ou partiellement la 
 dernière version ou une version plus ancienne de la spécification OpenMP. Chaque entreprise, groupe 
 ou entité qui voudrait mettre à disposition sa version d'OpenMP a, même s'il compte respecter à la lettre
@@ -234,7 +237,7 @@ de nombreuses fonctionnalités avancées comme l'association d'une tâche à un 
 spécifiques à l'OS), ou le choix du nombre de threads approprié, qui dépend de l'architecture.
 \\L'idée générale est de préciser les régions du code que l'on souhaite exécuter en parallèle. En C et 
 C++, cela se fait au moyen de pragmas. Il s'agit de directives adressées au compilateur, sur des lignes qui 
-commencent par la chaîne \#pragma omp. Une région signalé par un \#pragma omp parallel sera 
+commencent par la chaîne \#pragma omp. Une région signalée par un \#pragma omp parallel sera 
 exécutée autant de fois qu'il y aura eu de threads créés par le runtime. Ce nombre correspond généralement 
 au nombre de coeurs de la machine sur laquelle le programme est exécuté. Ainsi, dans le programme 
 ci-dessous, Hello World sera affiché quatre fois si la machine possède quatre coeurs.
@@ -336,7 +339,8 @@ ou StarPU.
 \\Il convient maintenant de mieux préciser le fonctionnement d'une implémentation OpenMP. Celui-ci est
 divisé en deux parties : une part du travail est réalisée à la compilation. En se basant sur les pragmas
 écrites par le programmeur, le compilateur va isoler dans le code les portions destinées à être exécutées
-en parallèle, et effectuer quelques autres transformations. 
+en parallèle, et effectuer quelques autres transformations. Une liste non exhaustive de compilateurs
+supportant OpenMP peut être trouvée ici\cite{ompcompiler}.
 \\ La deuxième partie du travail sera effectuée directement à l'exécution par un système runtime. À ce 
 moment seront déterminés des paramètres tels que le nombre de threads. Il faut bien comprendre que si les
 deux parties sont bien distinctes, elles sont néanmoins fortement interdépendantes : en règle générale,
@@ -452,7 +456,7 @@ Les architectures NUMA ont commencé à être étudiées, produites et vendues c
 du memory gap évoqué plus haut. Pour rappel, le memory gap désigne l'écart croissant entre les performances
 de calcul et les performances de bande-passante mémoire des architectures, les dernières étant désormais 
 largement dépassées par les premières. Dans le cas d'une architecture disposant de très nombreux coeurs,
-l'accès à la mémoire peut très vite devenir problématique dans la mesure où chacun des coeurs partagent
+l'accès à la mémoire peut très vite devenir problématique dans la mesure où l'ensemble des coeurs partagent
 les mêmes ressources pour récupérer leurs données. Ainsi, si beaucoup de coeurs essaient d'accéder en
 même temps à la mémoire, le temps d'accès par coeur se trouvera très dégradé, au point que l'augmentation
 du nombre de coeurs deviendra contre-productive. 
@@ -470,14 +474,14 @@ considéré comme acceptable entre un système multicoeurs à mémoire partagée
 \section{Avancées pendant le stage}
 L'idée de base est d'observer l'interaction entre OpenMP et les architectures NUMA. Plus explicitement,
 on veut savoir comment se déroule l'exécution d'un programme OpenMP sur une machine NUMA, et si 
-éventuellement des comportements non-optimaux peuvent se produire, à savoir est-il possible qu'un thread
-se trouve accéder à un noeud NUMA distant. Si la réponse est affirmative - et si le cas se produit 
+éventuellement des comportements non-optimaux peuvent se produire : un thread est-il susceptible 
+ d'accéder à un noeud NUMA distant ? Si la réponse est affirmative - et si le cas se produit 
 suffisamment souvent pour être considéré comme pathologique - peut-on améliorer la situation ?
 \\OpenMP ne gère jamais l'allocation des données en mémoire. De fait, les programmes reposent sur 
 l'implémentation présente en local de fonctions comme malloc ou calloc, ou même à plus bas niveau
 d'appels systèmes comme mmap. Une partie de mon travail a consisté à décrypter les interactions
 entre chacun de ces composants : quand un programme s'éxécutant sur un cpu donné alloue une variable,
-à quel moment et dans quelle partie de la mémoire elle sera réellement enregistrée ? Il m'a également fallu
+à quel moment et dans quelle partie de la mémoire sera-t-elle réellement enregistrée ? Il m'a également fallu
 décrypter le fonctionnement du support d'exécution OpenMP et notamment sa tactique quant à la migration de
 tâches (un problème que nous allons expliquer ensuite). Enfin, une partie importante était de réaliser des 
 benchmarks pour évaluer les pertes éventuelles dues à des accès à une mémoire distante. 
@@ -498,7 +502,7 @@ Les premiers ordinateurs laissaient leurs programmes accéder directement à la 
 système. Cela posaient de nombreux problèmes, le plus important étant celui de l'isolation des processus.
 Ainsi, un programme avait la possibilité de modifier les données d'un programme voisin. Ceci représentait
 une faille de sécurité majeure, dans la mesure où des programmes importants pouvaient se trouver invalidés
-par le travail d'un processus annexes. Une attention toute particulière devait être accordée aux accès 
+par le travail d'un processus annexe. Une attention toute particulière devait être accordée aux accès 
 à la mémoire.
 \\Pour remédier à ce problème, les informaticiens ont inventé dans les années 1960 le principe de la 
 mémoire virtuelle. La mémoire physique est divisée en ``blocs'' d'une taille donnée qu'on appelle
@@ -544,7 +548,7 @@ souvent accédés.\cite{numaaware}
 \\J'ai cherché à vérifier ce qu'il en était sur la machine que j'avais à disposition. Il existe une fonction
 bas niveau permettant, selon les paramètres, de déplacer une page vers un noeud donné, ou encore d'obtenir 
 le noeud sur lequel cette page se trouve au moment de l'appel : il s'agit de move\_pages. Ainsi l'appel
-suivant :
+suivant affiche le noeud sur lequel est stocké la section de mémoire pointée par ptr:
 
 \begin{lstlisting}
 #include <stdio.h>
@@ -839,7 +843,7 @@ cherché à réaliser des benchmarks mesurant le temps d'accès successifs à de
 \\La question s'est révélée plus compliquée que je ne l'avais anticipé et les questions qui se sont posées
 étaient assez nombreuses. Dans la mesure où le travail fait ici a été réinvesti dans la partie suivante du
 stage (de manière mieux construite et plus cohérente), il est plus simple que tout soit expliqué dans 
-la partie suivante, qui évoque mon travail pour construire un benchmark qui évalue la bande-passante mémoire
+cette partie, qui évoque mon travail pour construire un benchmark qui évalue la bande-passante mémoire
 sur une architecture donnée. 
 \\On va simplement décrire ici sommairement le principe du benchmark. Un tableau de flottants double précision
 est alloué et initialisé. Ensuite, un nombre déterminé de threads est créé (avec OpenMP). Chaque thread va 
@@ -973,7 +977,7 @@ par GCC, analyse le code compilé pour repérer d'éventuelles optimisations, co
 code mort à éliminer ou encore des variables intermédiaires à supprimer. Le gain d'une optimisation
 est difficile à estimer dans la mesure où il dépend du programme mais le temps d'exécution peut
 potentiellement changer d'un ordre de grandeur. le problème dans notre exemple est que notre variable
-est inutilisé, dans le sens où son élimination ne changera pas la sémantique du programme. On pourrait
+est inutilisée, dans le sens où son élimination ne changera pas la sémantique du programme. On pourrait
 simplement ajouter un print:
 \begin{lstlisting}
 void load(float * t, size_t siz)
@@ -994,7 +998,7 @@ En l'occurrence, dans notre code, on ferait de la sorte chacune des lectures, ma
 également un accès en écriture sur la variable res à chaque itération, alors que cette variable pourrait
 parfaitement être maintenue dans un registre. On ferait donc à chaque itération une lecture et une
 écriture, alors qu'on voulait originalement ne réaliser qu'une lecture. Nous devons donc maintenir
-une optimisation. Les développeurs de stream ne disent d'ailleurs pas autre chose :
+une optimisation. Les développeurs de STREAM ne disent d'ailleurs pas autre chose :
 
 \begin{quote}
  	3) Compile the code with optimization.  Many compilers generate
@@ -1051,7 +1055,7 @@ void load(float * t, size_t siz)
         red2 += t[i+2]; 
         red3 += t[i+3]; 
         red4 += t[i+4]; 
-        red5 += t[i+6]; 
+        red5 += t[i+5]; 
       }
     printf(``red = %d\n'', red + red1 + red2 + red3 + red4 + red5); 
 }
@@ -1061,7 +1065,7 @@ sont tous deux fortement dépendants de l'architecture, mais surtout de l'endroi
 à un certain moment. On met plus longtemps, par définition, à accéder à une donnée résidant en mémoire
 principale qu'à une donnée résidant dans un des niveaux de cache. De ce fait, on ne peut savoir avec
 certitude quel sera la latence d'un chargement. Ceci nous oblige, de manière générale, à mettre beaucoup
-de réductions, potentiellement plus que nécessaire. Cependant, insérer trop de réduction dans le code
+de réductions, potentiellement plus que nécessaire. Cependant, insérer trop de réductions dans le code
 peut faire apparaître un autre goulot d'étranglement : il peut désormais y avoir conflit pour l'accès 
 aux ressources de calculs. Imaginons par exemple que dans l'exemple ci-dessus, le coeur sur 
 lequel le code est exécuté ne dispose que de trois ressources d'addition de flottants. Dès lors, dans
@@ -1108,13 +1112,68 @@ opérations sur des vecteurs de 128, 256 ou même 512 bits pour les plus récent
 ici des vecteurs de 256 bits. Ci-dessous se trouve le code final. L'instruction clé est vmovpapd, pour
 ``vectorial move double floats''
 %TODO: insert codeasm.txt
+
+\begin{lstlisting}
+void load_asm(double const * t, intptr_t n, intptr_t k) 
+{
+	assert(n%4 == 0);
+	__m256d ldvec= {0,0,0,0};
+	intptr_t nbvloads= 0;
+	asm volatile (
+			//initialize load counter
+			//"movq $0, %%rcx;"
+			//"movq %%rcx, %1;"
+
+
+			//initialize outer loop counter
+			"movq $0, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jge 3f;"
+			
+			"4:;"
+
+			//initialize loop counter
+			"movq $0, %%rax;"
+			"cmpq %3, %%rax;"
+			"jge 2f;"
+
+
+
+			"1:;"
+			//vload from memory
+			"vmovapd (%2, %%rax, 8), %%ymm1;"
+			//increment and compare
+			"addq $4, %%rax;"
+			"cmpq %3, %%rax;"
+			"jl 1b;"
+
+
+
+			"2:;"
+
+			//outer loop test
+			"addq $1, %%rbx;"
+			"cmpq %4, %%rbx;"
+			"jl 4b;"
+
+			"3:;"
+			//"movq %%rcx, %1;"
+
+
+			: "=m" (ldvec) , "=m" ( nbvloads )
+			:"r" ( t ), "r" ( n ), "r" ( k )
+			:"%ymm1", "%rax", "%rbx"
+		     );
+}
+
+\end{lstlisting}
 Cette fonction prend en paramètre un tableau de flottant (plus précisément un pointeur), la taille de 
 ce tableau et un nombre d'itérations désiré. Elle va ensuite lire le tableau linéairement autant de fois
 qu'on l'aura demandé avec le deuxième paramètre.
 
 \subsection{Autres points d'implémentation}
 Nous disposons donc maintenant du coeur de travail du programme. Reste maintenant à faire tourner
-ce coeur de travail et à récupérer les informations qui nous intéresse. Rappelons que l'objectif initial
+ce coeur de travail et à récupérer les informations qui nous intéressent. Rappelons que l'objectif initial
 de ce benchmark (et ce qui le différencie par rapport aux autres déjà évoqués) est qu'il doit pouvoir
 tourner dans un contexte multi-threadé, avec un nombre de threads de préférences défini par l'utilisateur
 et chargeant chacun un nombre variable de données. 
@@ -1181,13 +1240,13 @@ manière aléatoire entre les threads. Si l'on veut fixer convenablement les thr
 on se voit obligé de travailler à un plus bas niveau. D'autre part, le travail que réalise OpenMP au 
 niveau du placement des threads est assez opaque et interagit de manière floue avec le reste du programme. 
 Entre autres, il n'est pas évident de savoir ce qu'il adviendra d'un thread fixé préalablement sur 
-un coeur qui entrerait dans une portion de code parallélisé avec OpenMP : sera-t-il ou non replacé si 
-on a donné des instructions à OpenMP ? Travailler à un plus bas niveau permet d'avoir un meilleur
+un coeur qui entrerait dans une portion de code parallélisé avec OpenMP : sera-t-il ou non déplacé si 
+par le support d'exécution ? Travailler à un plus bas niveau permet d'avoir un meilleur
 contrôle sur ces questions, même si cela demande plus de travail. 
 \\Je me suis donc remis à utiliser la bibliothèque pthread, celle sur laquelle est basé le code 
 d'OpenMP. La fonction pthread\_create prend en argument, entre autres choses, une fonction 
 handler (qui contient le code que le thread va exécuter) ainsi qu'un pointeur générique permettant 
-de passer des arguments. Voici la structure utilisée pour passer des arguments : 
+de passer des arguments. Voici la structure que j'ai utilisée : 
 \begin{lstlisting}
 //arguments passed
 //to thread handler
@@ -1238,7 +1297,7 @@ Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter,
 \end{lstlisting}
 On récupère et affiche également le numéro du coeur sur lequel le thread s'est exécuté.
 \\Il suffit désormais de récupérer les tailles des tableaux qu'on veut charger et de les passer en 
-paramètres dans une structure. Pour cela, on se contente de les récupérer par la sortie standard. 
+paramètres dans une structure. Pour cela, on se contente de les récupérer par l'entrée standard. 
 Ceci permet un usage plus commode. On peut écrire les tailles des tableaux désirées dans un fichier 
 et le passer par le biais d'un pipe au programme, comme ceci : 
 
@@ -1268,9 +1327,10 @@ double précision et un thread ostracisé chargeant un tableau de 2000000 flotta
 \begin{lstlisting}[language=bash]
 cat threadsizes | ./load -slow=1 -places=spread
 \end{lstlisting}
-Par ailleurs, quelques problèmes techniques se sont posés. Ainsi, le programme se terminait de temps à 
+D'autre part, quelques problèmes techniques se sont posés. Ainsi, le programme se terminait de temps à 
 autre sur une erreur de segmentation. Il m'a fallu un peu de recherche pour me rendre compte que 
-l'instruction de load que j'utilisais réclamait un pointeur aligné sur 32 octets. Il est donc nécessaire d'aligner notre tableau, ce que je fais grâce à la fonction suivante : 
+l'instruction de load que j'utilisais réclamait un pointeur aligné sur 32 octets. Il est donc 
+nécessaire d'aligner notre tableau, ce que je fais grâce à la fonction suivante : 
 \begin{lstlisting}
 //takes a pointer and returns it
 //rounded up on upper n bound
@@ -1283,7 +1343,7 @@ char * align_ptr(char * t, intptr_t n)
 \end{lstlisting}
 Par ailleurs, sur un plan plus pratique, la question du nombre d'itérations à exécuter s'est posée. Ce 
 nombre était au départ statique, mais cela avait pour conséquence que le temps d'exécution du programme
-variaient avec la taille du donnée, au point d'ailleurs qu'il devenait beaucoup trop long pour des 
+variaient avec la taille des données, au point d'ailleurs qu'il devenait beaucoup trop long pour des 
 données trop grande, par exemple pour plusieurs méga ou même gigaoctets. L'autre conséquence est 
 que chaque thread aura un temps d'exécution différent, ce qui fausse la donne par rapport aux
 phénomènes que l'on veut observer. Pour améliorer mon programme sur la question, j'ai choisi 
@@ -1316,7 +1376,7 @@ prédictions.
 
 \section{Tests et résultats}
 On a déjà évoqué la machine Idchire sur laquelle on faisait nos tests. Dans la mesure où cette machine
-a connu des problèmes de maintenance et a été à plusieurs reprises indisponibles, mais aussi parce qu'il
+a connu des problèmes de maintenance et a été à plusieurs reprises indisponible, mais aussi parce qu'il
 était plus intéressant de disposer de plusieurs architectures, j'ai eu accès à une autre machine, gérée
 celle-ci directement par l'équipe, et dénommée Dracula. Celle-ci possède quatre coeurs sur un seul noeud,
 tout en étant d'une génération plus récente que Idchire et possédant donc quelques instructions 
@@ -1325,8 +1385,8 @@ conclusions qu'on a pu en tirer.
 \subsection{Tests sur la machine NUMA}
 Revenons d'abord sur le sujet qui a occupé la première partie de mon stage. Si, dans le dernier chapitre,
 je présente une version aboutie du benchmark que j'ai construit, l'ensemble des connaissances 
-nécessaire à sa réalisation, ainsi que des différents pièges et difficultés n'ont été acquises que 
-progressivement. Ainsi, les premiers tests que j'ai pu effectués l'ont été avec une version très naïve
+nécessaires à sa réalisation, ainsi que des différents pièges et difficultés n'ont été acquises que 
+progressivement. Ainsi, les premiers tests que j'ai pu effectuer l'ont été avec une version très naïve
 de ce qu'allait ensuite devenir le programme. Le benchmark tel que je l'avais écrit sur le moment 
 était notamment compilé sans optimisation, sans que je mesure l'impact qu'une telle décision pouvait
 avoir sur la performance. Le fait que les placements de threads d'OpenMP pouvait avoir une influence
@@ -1421,7 +1481,7 @@ cache dans une architecture et les problématiques qui se sont posées.
 
 \section{Cache et bande-passante}
 Le principe du cache et son intérêt avait déjà été présenté plus haut dans le chapitre sur la 
-hierarchie mémoire. L'idée est d'offrir aux coeurs des portions de mémoire plus proche et plus 
+hiérarchie mémoire. L'idée est d'offrir aux coeurs des portions de mémoire plus proche et plus 
 rapide que la mémoire principale, et d'espérer que le programme trouvera aussi souvent que possible
 une donnée dans le cache et non dans la mémoire. En effet, les emplacements du cache ne sont pas
 réellement adressables : toute donnée présente dans un cache est une réplication d'une donnée
@@ -1519,7 +1579,7 @@ Comme on a fait l'hypothèse que le cache fonctionne en pur PLRU, alors la quest
 savoir si $\Delta(d) < C$. Si oui d se trouve dans le cache, sinon il a été évicté.
 \\Soit i tel que $T_i \leq \frac{C}{N}$. Soit t une donnée accédée par i.
 On a $\forall j \leq i, T_{j} \leq T_{i} \leq \frac{C}{N}$.  On peut en déduire que $\forall j < i, 
-\delta_{j}(t) \geq \frac{C}{N}$.
+\delta_{j}(t) \leq \frac{C}{N}$.
 D'autre part, si un thread accède à plus de données qu'un autre, il a plus de chance de faire
 des miss et va donc au moins aussi lentement.
 Donc pour $k > i$, comme ${T_{k}}\geq{T_{i}}$, on peut affirmer que $\delta_k(t)\leq \frac{C}{N}$.
@@ -1536,7 +1596,8 @@ programme sur idchire avec les paramètres suivants : un thread chargeant des do
 en plus large fait des lectures. On fait tourner en parallèle un autre thread qui charge lui 
 des données beaucoup plus grande (plusieurs fois la taille du cache) puis deux autres, puis 
 trois, etc. et on regarde les performances du premier thread. Les résultats sur Dracula
-et Idchire sont présentés en figure \ref{fig:dracasbench} et \ref{fig:idchasbench}. 
+et Idchire sont présentés en figure \ref{fig:dracasbench} et \ref{fig:idchasbench}. Les
+lignes verticales représentent la taille du cache divisée par le nombre de threads.
 \\La loi n'est pas parfaitement suivie, notamment sur Dracula, mais on voit néanmoins qu'elle
 décrit correctement le comportement des threads au moins d'un point de vue qualitatif. Cependant,
 elle n'est pas très satisfaisante parce qu'elle ne décrit qu'un cas particulier. On aimerait
@@ -1555,8 +1616,9 @@ proposition suivante vient de mon tuteur :
 Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
 accèdent respectivement, triées par ordre croissant. Soit C la taille du cache. On note $B_c$ la 
 vitesse d'accès au cache et $B_m$ la vitesse d'accès à la mémoire principale. On affirme que :
-$\forall i$, si $\sum_{j=1}^{i}{T_{j}} + \frac{B_m}{B_C} * T_i * (N - i) \leq C$, alors le
-thread i ne subit pas de miss. Sinon, il est en full miss.
+$\forall i$, si 
+\\$\sum_{j=1}^{i}{T_{j}} + \frac{B_m}{B_C} * T_i * (N - i) \leq C$
+\\alors le thread i ne subit pas de miss. Sinon, il est en full miss.
 \end{th2}
 
 Dans ce modèle, on va considérer que les threads sont soit en full miss, soit en full hits.
@@ -1681,11 +1743,11 @@ marquée 2 par une ligne marquée 6 renverrait un arbre dans l'état suivant :
 ; 
 
 \end{tikzpicture}
-On se convainc facilement que cet algorithme a pour effet de protéger la dernière 
+\\On se convainc facilement que cet algorithme a pour effet de protéger la dernière 
 donnée accédée. On peut imaginer des cas où ce n'est pas la donnée la plus ancienne
 qui est évictée : il suffit pour cela que cette donnée soit situé dans la même partie
 d'arbre que la donnée la plus récemment accédée. Néanmoins, cet algorithme semble
-bien émuler un comportement LRU suffisamment efficacement pour l'usage courant.
+bien émuler un comportement LRU suffisamment efficace pour l'usage courant.
 \\J'ai voulu savoir si cette distinction pouvait expliquer l'écart de prévisions
 avec le LRU pur. Il n'en est rien : dans le cas de accès très linéaires, cet 
 algorithme se comporte très exactement comme un LRU. Il fallait donc chercher
@@ -1695,9 +1757,9 @@ les algorithmes de remplacement de diverses architectures. C'est le cas du trava
 présenté dans ce papier \cite{cachemodeling}. Décrire entièrement leur travail
 dépasse la portée de ce rapport, mais l'idée générale est de s'arranger pour 
 mettre le cache dans un état connu, puis de vérifier au bout de combien d'évictions
-une ligne se trouve remplacé. On obtient pas ainsi d'informations sur la technique
+une ligne se trouve remplacée. On obtient pas ainsi d'informations sur la technique
 d'implémentation du cache, mais le comportement se retrouve lui explicité. 
-Malheureusement, les auteurs n'ont semblent-ils pas mis leur code en ligne, ce
+Malheureusement, les auteurs n'ont semble-il pas mis leur code en ligne, ce
 qui m'a empêché de réaliser leurs tests sur mes architectures. Refaire leur 
 travail à partir de leur description me semblait trop compliqué et je manquais de 
 toute façon de temps. Néanmoins, les auteurs décrivent une politique de remplacement
@@ -1736,7 +1798,7 @@ base de cette hypothèse. Je l'ai exprimé récursivement de cette manière :
 \begin{th3}
 Soit N un nombre de threads, $T_1, T_2, \cdots T_N$ les tailles des données auxquelles ces threads
 accèdent respectivement en ordre croissant. On note $\Delta(i)$ la distance de réutilisation globale 
-d'une donnée accédée par le thread i,$\delta_i(j)$ la quantité de données accédées par un thread i
+d'une donnée accédée par le thread i, $\delta_i(j)$ la quantité de données accédées par un thread i
 pendant l'intervalle entre deux accès à une même donnée du thread j, f la fonction empirique censée 
 nous donner une vitesse d'accès en fonction d'une distance de réutilisation et $V_1, V_2 \cdots V_N$ 
 les vitesses d'accès respectives de chacun des threads. On a, par définition de f, $\forall 
@@ -1757,7 +1819,7 @@ partant de la dernière. Voici le raisonnement :
   $\delta_j(i) = T_j$ puisque le thread j accède plus rapidement à moins de données que i. 
   \\Voyons maintenant pour $k > i$. On connait la vitesse d'accès $V_k$ de k, on a donc
   $\delta_k(i) = V_k * t_i $ où $t_i$ est l'intervalle de temps entre deux accès à une donnée de i.
-  Or, ce temps s'exprime comme ceci : $t = \frac{T_i}{V_i} $.
+  Or, ce temps s'exprime comme ceci : $t_i = \frac{T_i}{V_i} $.
   \\ Cette quantité est aussi égale à $\frac{T_i}{f(\Delta(i))}$ par définition de f.
   \\Finalement, on obtient : 
   $\delta_k(i) = V_k * \frac{T_i}{f(\Delta(i))}$
@@ -1768,7 +1830,7 @@ partant de la dernière. Voici le raisonnement :
 Les équations étant basées sur une fonction empirique, elles ne sont pas résolvables analytiquement, 
 mais on peut par contre utiliser une méthode numérique pour trouver une solution approchée. J'ai 
 choisi d'utiliser une méthode de Newton, épaulée au besoin (quand on n'est pas capable de fournir 
-une valeur initiale de la solution) par une simple bisection. Pour cela, j'ai utilisé la 
+une valeur initiale suffisamment de la solution) par une simple bisection. Pour cela, j'ai utilisé la 
 bibliothèque numpy de python. 
 \begin{lstlisting}[language=python]
 #take a reverse sorted thread sizes list and 
@@ -1842,7 +1904,7 @@ des hits. Au point où j'en suis, il me semble qu'un modèle plus pointu devra a
 J'ai donc présenté dans ce rapport l'ensemble de mes activités durant mes six mois de stage à l'Inria
 Grenoble. Sur un plan professionnel, je crois avoir réussi à faire profiter mon équipe de mes compétences,
 notamment grâce au travail réalisé sur le benchmark qui a été réutilisé par d'autres membres dans le cadre
-d'un travail annexe. Je trouve dommage de n'avoir pas pu aboutir sur le sujet de la prédiction de cache. 
+d'un projet annexe. Je trouve dommage de n'avoir pas pu aboutir sur le sujet de la prédiction de cache. 
 Il me semble néanmoins avoir exploré des pistes intéressantes, qui peuvent former une bonne
 base de réflexion à de futurs travaux.
 \\Sur un plan plus personnel, ces six mois m'ont permis de développer très largement mes connaissances et
