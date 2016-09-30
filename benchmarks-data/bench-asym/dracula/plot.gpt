@@ -1,0 +1,8 @@
+set title 'Asymetric load on Dracula'
+set arrow from 1500000,5 to 1500000,45 nohead lc rgb 'red'
+set arrow from 2000000,5 to 2000000,45 nohead lc rgb 'green'
+set arrow from 3000000,5 to 3000000,45 nohead lc rgb 'blue'
+set xlabel "total load (B)" 
+set ylabel "bandwidth (GB/s)"
+plot  "results4.txt" using 1:2 with linespoint t '4 threads', "results3.txt" using 1:2 with linespoint t '3 threads', "results2.txt" using 1:2 with linespoint t '2 threads'
+pause -1

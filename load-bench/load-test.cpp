@@ -93,7 +93,6 @@ int main(int argc, char ** argv)
 	param->info();
 	
 
-
 	printf(HLINE);
 	BytesPerWord = sizeof(double);
 	printf("This system uses %d bytes per DOUBLE PRECISION word.\n",

@@ -1,0 +1,12 @@
+set title 'Asymetric load on Idchire'
+set arrow from 2500000,4 to 2500000,22 nohead lc rgb 'green'
+set arrow from 2857000,4 to 2847000,22 nohead lc rgb 'blue'
+set arrow from 3333333,4 to 3333333,22 nohead lc rgb 'pink'
+set arrow from 4000000,4 to 4000000,22 nohead lc rgb 'purple'
+set arrow from 5000000,4 to 5000000,22 nohead lc rgb 'red'
+set arrow from 6666666,4 to 6666666,22 nohead lc rgb 'brown'
+set arrow from 10000000,4 to 10000000,22 nohead lc rgb 'black'
+set xlabel "total load (B)" 
+set ylabel "bandwidth (GB/s)"
+plot  "results8.txt" using 1:2 with linespoint t '8 threads' lc rgb 'green',"results7.txt" using 1:2 with linespoint t '7 threads' lc rgb 'blue',"results6.txt" using 1:2 with linespoint t '6 threads' lc rgb 'pink',"results5.txt" using 1:2 with linespoint t '5 threads' lc rgb 'purple',"results4.txt" using 1:2 with linespoint t '4 threads' lc rgb 'red', "results3.txt" using 1:2 with linespoint t '3 threads' lc rgb 'brown', "results2.txt" using 1:2 with linespoint t '2 threads' lc rgb 'black'
+pause -1

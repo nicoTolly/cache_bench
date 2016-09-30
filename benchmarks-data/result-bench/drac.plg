@@ -1,0 +1,15 @@
+set title 'Throughput on dracula'
+set logscale x
+set xlabel 'total load (B)'
+set ylabel ' Throughput (GB/s)'
+set arrow from 6000000,0 to 6000000,300 nohead lc rgb 'red'
+plot 'bench_dracula_1th.txt' using 1:2 with linespoint t '1 thread',\
+ 'bench_dracula_2th.txt' using 1:2 with linespoint t '2 thread',\
+ 'bench_dracula_3th.txt' using 1:2 with linespoint t '3 thread',\
+ 'bench_dracula_4th.txt' using 1:2 with linespoint t '4 thread',\
+# 'bench_dracula_5th.txt' using 1:2 with linespoint t '5 thread',\
+# 'bench_dracula_6th.txt' using 1:2 with linespoint t '6 thread',\
+# 'bench_dracula_7th.txt' using 1:2 with linespoint t '7 thread',\
+# 'bench_dracula_8th.txt' using 1:2 with linespoint t '8 thread',\
+# 'bench_dracula_9th.txt' using 1:2 with linespoint t '9 thread'
+ pause -1
