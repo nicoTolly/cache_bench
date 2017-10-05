@@ -132,28 +132,29 @@ def calculate_cache(lThreads, lBw, data):
 
 
 
-try:
-    datafile = sys.argv[1]
-except:
-    raise NoArgException("you must give a data file as input")
+if __name__ == "__main__":
+    try:
+        datafile = sys.argv[1]
+    except:
+        raise NoArgException("you must give a data file as input")
 
-with open(datafile, "r") as dataf:
-    line = dataf.readline()
-    datakeys = []
-    dataval = []
-    data = dict()
-    # retrieve data from files
-    while(line ):
-        l = line.split()
-        data[int(l[0])]= float(l[1])
-        datakeys.append(int(l[0]))
-        dataval.append(float(l[1]))
+    with open(datafile, "r") as dataf:
         line = dataf.readline()
+        datakeys = []
+        dataval = []
+        data = dict()
+        # retrieve data from files
+        while(line ):
+            l = line.split()
+            data[int(l[0])]= float(l[1])
+            datakeys.append(int(l[0]))
+            dataval.append(float(l[1]))
+            line = dataf.readline()
 
 
-thrlist = get_threads()
-# we want to iterate on threads in
-# decreasing order 
-tabThr = sorted(thrlist, reverse=True)
-lBw = calculate_cache(tabThr, [], data)
-print(lBw)
+    thrlist = get_threads()
+    # we want to iterate on threads in
+    # decreasing order 
+    tabThr = sorted(thrlist, reverse=True)
+    lBw = calculate_cache(tabThr, [], data)
+    print(lBw)
