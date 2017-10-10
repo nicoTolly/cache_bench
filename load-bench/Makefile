@@ -1,5 +1,6 @@
 CC=g++
-DEBUG=
+AS=nasm
+DEBUG=yes
 HWLOC=yes
 HUGEPAGES=
 AVX=yes
@@ -18,6 +19,9 @@ endif
 SRC= load-test.cpp parser.cpp utils.cpp
 LDFLAGS= -lpthread -lrt 
 
+ASM_FLAGS=-felf64
+ASM_DIR=
+
 ifeq ($(HWLOC), yes)
 	CXXFLAGS+= -DHWLOC
 	LDFLAGS+=-lhwloc
@@ -31,12 +35,23 @@ endif
 ifeq ($(AVX), yes)
 	CXXFLAGS+= -mavx
 	CXXFLAGS+= -DUSE_AVX
+	ASM_DIR=$(PROJECT_ROOT_DIR)/x86_avx
+else
+	ASM_DIR=$(PROJECT_ROOT_DIR)/x86_sse
 endif
+
+ASM_SRC= kernel.asm get_cycles.asm
 
 PROJECT_ROOT_DIR= $(shell pwd)
 
 DEBUG_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(SRC:.cpp=.o))
 RELEASE_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(SRC:.cpp=.o))
+#DEBUG_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(ASM_SRC:.asm=.o))
+#RELEASE_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(ASM_SRC:.asm=.o))
+DEBUG_OBJECTS += $(PROJECT_ROOT_DIR)/debug_obj/kernel.o
+RELEASE_OBJECTS += $(PROJECT_ROOT_DIR)/release_obj/kernel.o
+DEBUG_OBJECTS += $(PROJECT_ROOT_DIR)/debug_obj/get_cycles.o
+RELEASE_OBJECTS += $(PROJECT_ROOT_DIR)/release_obj/get_cycles.o
 
 
 .PHONY: all
@@ -62,6 +77,28 @@ $(PROJECT_ROOT_DIR)/release_obj/%.o: %.cpp
 
 $(PROJECT_ROOT_DIR)/debug_obj/%.o: %.cpp
 	$(CC) $(CXXFLAGS) -o $@ -c $<
+
+
+# Assembly files
+$(PROJECT_ROOT_DIR)/release_obj/get_cycles.o: $(ASM_DIR)/get_cycles.asm
+	$(AS) $(ASM_FLAGS) -o $@ $<
+
+$(PROJECT_ROOT_DIR)/debug_obj/get_cycles.o: $(ASM_DIR)/get_cycles.asm
+	$(AS) $(ASM_FLAGS) -o $@ $<
+
+#ifeq ($(AVX), yes)
+$(PROJECT_ROOT_DIR)/release_obj/kernel.o: $(ASM_DIR)/kernel.asm
+	$(AS) $(ASM_FLAGS) -o $@ $<
+
+$(PROJECT_ROOT_DIR)/debug_obj/kernel.o: $(ASM_DIR)/kernel.asm
+	$(AS) $(ASM_FLAGS) -o $@ $<
+#else
+#$(PROJECT_ROOT_DIR)/release_obj/kernel.o: $(PROJECT_ROOT_DIR)/sse_kernel.asm
+#	$(AS) $(ASM_FLAGS) -o $@ $<
+#
+#$(PROJECT_ROOT_DIR)/debug_obj/kernel.o: $(PROJECT_ROOT_DIR)/sse_kernel.asm
+#	$(AS) $(ASM_FLAGS) -o $@ $<
+#endif
 
 depend:.depend
 

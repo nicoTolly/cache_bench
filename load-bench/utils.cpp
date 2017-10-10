@@ -37,27 +37,27 @@ int siz(unsigned int n)
 	printf("Error: n is too large!\n");
 }
 
-inline unsigned long get_cycles()
-{
-	uint32_t eax = 0, edx;
-
-	__asm__ __volatile__(
-			//get informations on cpu
-			"cpuid;"
-			// get timestamp since last reset
-			"rdtsc;"
-			: "+a" (eax), "=d" (edx)
-			:
-			: "%rcx", "%rbx", "memory");
-
-	__asm__ __volatile__("xorl %%eax, %%eax;"
-			"cpuid;"
-			:
-			:
-			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
-
-	return (((uint64_t)edx << 32) | eax);
-}
+//inline unsigned long get_cycles()
+//{
+//	uint32_t eax = 0, edx;
+//
+//	__asm__ __volatile__(
+//			//get informations on cpu
+//			"cpuid;"
+//			// get timestamp since last reset
+//			"rdtsc;"
+//			: "+a" (eax), "=d" (edx)
+//			:
+//			: "%rcx", "%rbx", "memory");
+//
+//	__asm__ __volatile__("xorl %%eax, %%eax;"
+//			"cpuid;"
+//			:
+//			:
+//			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
+//
+//	return (((uint64_t)edx << 32) | eax);
+//}
 
 int checktick()
     {

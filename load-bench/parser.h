@@ -31,9 +31,9 @@ class ThrParam
 	
 	size_t globsiz;
 	//standard size of array
-	long fsiz;
+	uint64_t fsiz;
 	//standard size of array
-	long ssiz;
+	uint64_t ssiz;
 	// number of CPU per NUMA node
 	int nbPUNode;
 	//total number of threads

@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "utils.h"
 #include <sched.h>
+#include <stdint.h>
 
 #include <algorithm>
 
@@ -24,17 +25,17 @@
 void * handler(void * arg);
 void * handler_slw(void * arg);
 char * align_ptr(char * t, intptr_t n);
-#ifdef USE_AVX
-void __attribute__((optimize("O0"))) load_asm(double const * t, intptr_t n, intptr_t k) ;
-void __attribute__((optimize("O0"))) load_asm2(double const * t, intptr_t n, intptr_t k) ;
-void __attribute__((optimize("O0"))) load_asm_slw(double const * t, intptr_t n, intptr_t k) ;
-#endif
+
+
+extern "C" int ld_vect(double * t, uint64_t n, uint64_t k);
+extern "C" int ld_vect_slw(double * t, uint64_t n, uint64_t k);
+extern "C" unsigned long get_cycles();
 
 #undef USE_PADDING
 void __attribute__((optimize("O0"))) load_asm_sse(double const * t, intptr_t n, intptr_t k) ;
 
 
-inline unsigned long get_cycles();
+//inline unsigned long get_cycles();
 
 __m256d trash;
 
@@ -48,8 +49,8 @@ typedef struct
 	double *t;
 	double * time;
 	pthread_barrier_t * bar;
-	long size;
-	long niter;
+	uint64_t size;
+	uint64_t niter;
 	unsigned long *cycle;
 } args_t;
 
@@ -66,7 +67,7 @@ int main(int argc, char ** argv)
 
 	int quantum;
 	int BytesPerWord;
-	long nb_iter;
+	uint64_t nb_iter;
 	unsigned long load_bytes;
 #ifdef USE_PADDING
 // We introduce some padding in data to see if 
@@ -417,11 +418,7 @@ void * handler(void * arg)
 	cyc = get_cycles();
 	time = mysecond();
 	//load_asm(args->t, args->size, args->niter);
-#ifdef USE_AVX
-	load_asm2(args->t, args->size, args->niter);
-#else
-	load_asm_sse(args->t, args->size, args->niter);
-#endif
+	ld_vect(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
@@ -449,12 +446,7 @@ void * handler_slw(void * arg)
 
 	cyc = get_cycles();
 	time = mysecond();
-#ifdef USE_AVX
-	load_asm(args->t, args->size, args->niter);
-#else
-	load_asm_sse(args->t, args->size, args->niter);
-#endif
-	//load_asm(args->t, args->size, args->niter);
+	ld_vect_slw(args->t, args->size, args->niter);
 	time = mysecond() - time;
 	cyc = get_cycles() - cyc;
 	*(args->time) = time;
@@ -466,351 +458,41 @@ Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter,
 
 //takes a pointer and returns it
 //rounded up on upper n bound
+//char * align_ptr(char * t, intptr_t n)
+//{
+//	intptr_t ptr;
+//	ptr = (intptr_t)(t + n) & ~(n - 1);
+//	return (char *)ptr;
+//}
+
 char * align_ptr(char * t, intptr_t n)
 {
-	intptr_t ptr;
-	ptr = (intptr_t)(t + n) & ~(n - 1);
+	intptr_t ptr = (intptr_t) t;
+
+	ptr = ((ptr % n == 0) ? ptr :(ptr + n) & ~(n - 1));
 	return (char *)ptr;
 }
 
-#ifdef USE_AVX
-
-void load_asm(double const * t, intptr_t n, intptr_t k) 
-{
-	assert(n%4 == 0);
-	__m256d ldvec= {0,0,0,0};
-	intptr_t nbvloads= 0;
-	asm volatile (
-			//initialize load counter
-			//"movq $0, %%rcx;"
-			//"movq %%rcx, %1;"
 
 
-			//initialize outer loop counter
-			"movq $0, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jge 3f;"
-			
-			"4:;"
-
-			//initialize loop counter
-			"movq $0, %%rax;"
-			"cmpq %3, %%rax;"
-			"jge 2f;"
-
-
-
-			"1:;"
-			//vload from memory
-			"vmovapd (%2, %%rax, 8), %%ymm1;"
-			//increment vload counter
-			//"addq $1, %%rcx;"
-			//increment and compare
-			"addq $4, %%rax;"
-			"cmpq %3, %%rax;"
-			"jl 1b;"
-
-
-
-			"2:;"
-			//"vmovapd %%ymm1, %0;"
-
-			//outer loop test
-			"addq $1, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jl 4b;"
-
-			"3:;"
-			//"movq %%rcx, %1;"
-
-
-			: "=m" (ldvec) , "=m" ( nbvloads )
-			:"r" ( t ), "r" ( n ), "r" ( k )
-			:"%ymm1", "%rax", "%rbx"//, "%rcx"
-		     );
-	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
-}
-
-void load_asm2(double const * t, intptr_t n, intptr_t k) 
-{
-	assert(n%32 == 0);
-	__m256d ldvec= {0,0,0,0};
-	intptr_t nbvloads= 0;
-	asm volatile (
-			//initialize load counter
-			//"movq $0, %%rcx;"
-			//"movq %%rcx, %1;"
-
-
-			//initialize outer loop counter
-			"movq $0, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jge 3f;"
-			
-			"4:;"
-
-			//initialize loop counter
-			"movq $0, %%rax;"
-			"cmpq %3, %%rax;"
-			"jge 2f;"
-
-
-
-			"1:;"
-			//vload from memory
-			"vmovapd (%2, %%rax, 8), %%ymm0;"
-			"vmovapd 32(%2, %%rax, 8), %%ymm1;"
-			"vmovapd 64(%2, %%rax, 8), %%ymm2;"
-			"vmovapd 96(%2, %%rax, 8), %%ymm3;"
-			"vmovapd 128(%2, %%rax, 8), %%ymm4;"
-			"vmovapd 160(%2, %%rax, 8), %%ymm5;"
-			"vmovapd 192(%2, %%rax, 8), %%ymm6;"
-			"vmovapd 224(%2, %%rax, 8), %%ymm7;"
-			//increment vload counter
-			//"addq $1, %%rcx;"
-			//increment and compare
-			"addq $32, %%rax;"
-			"cmpq %3, %%rax;"
-			"jl 1b;"
-
-
-
-			"2:;"
-			//"vmovapd %%ymm1, %0;"
-
-			//outer loop test
-			"addq $1, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jl 4b;"
-
-			"3:;"
-			//"movq %%rcx, %1;"
-
-
-			: "=m" (ldvec) , "=m" ( nbvloads )
-			:"r" ( t ), "r" ( n ), "r" ( k )
-			:"%ymm1", "%rax", "%rbx"//, "%rcx"
-		     );
-	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
-}
-
-
-#endif
-
-void load_asm_sse(double const * t, intptr_t n, intptr_t k) 
-{
-	assert(n%32 == 0);
-	__m256d ldvec= {0,0,0,0};
-	intptr_t nbvloads= 0;
-	asm volatile (
-			//initialize load counter
-			//"movq $0, %%rcx;"
-			//"movq %%rcx, %1;"
-
-
-			//initialize outer loop counter
-			"movq $0, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jge 3f;"
-			
-			"4:;"
-
-			//initialize loop counter
-			"movq $0, %%rax;"
-			"cmpq %3, %%rax;"
-			"jge 2f;"
-
-
-
-			"1:;"
-			//vload from memory
-			"movapd (%2, %%rax, 8), %%xmm0;"
-			"movapd 16(%2, %%rax, 8), %%xmm4;"
-			"movapd 32(%2, %%rax, 8), %%xmm1;"
-			"movapd 48(%2, %%rax, 8), %%xmm5;"
-			"movapd 64(%2, %%rax, 8), %%xmm2;"
-			"movapd 80(%2, %%rax, 8), %%xmm6;"
-			"movapd 96(%2, %%rax, 8), %%xmm3;"
-			"movapd 112(%2, %%rax, 8), %%xmm7;"
-			//increment vload counter
-			//"addq $1, %%rcx;"
-			//increment and compare
-			"addq $16, %%rax;"
-			"cmpq %3, %%rax;"
-			"jl 1b;"
-
-
-
-			"2:;"
-			//"vmovapd %%ymm1, %0;"
-
-			//outer loop test
-			"addq $1, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jl 4b;"
-
-			"3:;"
-			//"movq %%rcx, %1;"
-
-
-			: "=m" (ldvec) , "=m" ( nbvloads )
-			:"r" ( t ), "r" ( n ), "r" ( k )
-			:"%xmm1", "%rax", "%rbx"//, "%rcx"
-		     );
-	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
-}
-
-
-void load_asm_slw(double const * t, intptr_t n, intptr_t k) 
-{
-	assert(n%4 == 0);
-	__m256d ldvec= {0,0,0,0};
-	intptr_t nbvloads= 0;
-	asm volatile (
-			//initialize load counter
-			//"movq $0, %%rcx;"
-			//"movq %%rcx, %1;"
-
-
-			//initialize outer loop counter
-			"movq $0, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jge 3f;"
-			
-			"4:;"
-
-			//initialize loop counter
-			"movq $0, %%rax;"
-			"cmpq %3, %%rax;"
-			"jge 2f;"
-
-
-
-			"1:;"
-			//vload from memory
-			"vmovapd (%2, %%rax, 8), %%ymm1;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			"nop;"
-			//increment vload counter
-			//"addq $1, %%rcx;"
-			//increment and compare
-			"addq $4, %%rax;"
-			"cmpq %3, %%rax;"
-			"jl 1b;"
-
-
-
-			"2:;"
-			"vmovapd %%ymm1, %0;"
-
-			//outer loop test
-			"addq $1, %%rbx;"
-			"cmpq %4, %%rbx;"
-			"jle 4b;"
-
-			"3:;"
-			//"movq %%rcx, %1;"
-
-
-			: "=m" (ldvec) , "=m" ( nbvloads )
-			:"r" ( t ), "r" ( n ), "r" ( k )
-			:"%ymm1", "%rax", "%rbx"//, "%rcx"
-		     );
-	//printf("nb loads done= %ld, expected %ld \n", nbvloads, n * k / 4 );
-}
-
-inline unsigned long get_cycles()
-{
-	uint32_t eax = 0, edx;
-
-	__asm__ __volatile__(
-			//get informations on cpu
-			"cpuid;"
-			// get timestamp since last reset
-			"rdtsc;"
-			: "+a" (eax), "=d" (edx)
-			:
-			: "%rcx", "%rbx", "memory");
-
-	__asm__ __volatile__("xorl %%eax, %%eax;"
-			"cpuid;"
-			:
-			:
-			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
-
-	return (((uint64_t)edx << 32) | eax);
-}
+//inline unsigned long get_cycles()
+//{
+//	uint32_t eax = 0, edx;
+//
+//	__asm__ __volatile__(
+//			//get informations on cpu
+//			"cpuid;"
+//			// get timestamp since last reset
+//			"rdtsc;"
+//			: "+a" (eax), "=d" (edx)
+//			:
+//			: "%rcx", "%rbx", "memory");
+//
+//	__asm__ __volatile__("xorl %%eax, %%eax;"
+//			"cpuid;"
+//			:
+//			:
+//			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
+//
+//	return (((uint64_t)edx << 32) | eax);
+//}

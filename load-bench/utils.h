@@ -32,7 +32,8 @@ char units(unsigned int n);
 int siz(unsigned int n);
 char units_d(double f);
 double siz_d(double n);
-inline unsigned long get_cycles();
+//inline unsigned long get_cycles();
+extern "C" unsigned long get_cycles();
 int checktick();
 double mysecond();
 void print_status();
@@ -40,3 +41,4 @@ long get_nb_iter(long size);
 long *  get_tab_iter(int * sizes, int nsiz);
 template <typename T> T array_sum(T * arr, int siz);
 long array_sum(long * arr, int siz);
+
