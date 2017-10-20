@@ -19,21 +19,23 @@ ld_vect:
 
 
 ; outer loop, loading array k times
+align 16
 .outer:
   ; rcx holds the number of words that have been loaded
   xor rcx,rcx
+align 16
 .inner:
   ; do 4 parallel loads
   ; hopefully this is enough to get rid of
   ; false dependencies
   vmovapd ymm0, [rdi + 8 * rcx] 
-  vmovapd ymm1, [rdi + 8 * rcx + 32] 
-  vmovapd ymm2, [rdi + 8 * rcx + 64] 
-  vmovapd ymm3, [rdi + 8 * rcx + 96] 
-  vmovapd ymm4, [rdi + 8 * rcx + 128] 
-  vmovapd ymm5, [rdi + 8 * rcx + 160] 
-  vmovapd ymm6, [rdi + 8 * rcx + 192] 
-  vmovapd ymm7, [rdi + 8 * rcx + 224] 
+  vmovapd ymm0, [rdi + 8 * rcx + 32] 
+  vmovapd ymm0, [rdi + 8 * rcx + 64] 
+  vmovapd ymm0, [rdi + 8 * rcx + 96] 
+  vmovapd ymm0, [rdi + 8 * rcx + 128] 
+  vmovapd ymm0, [rdi + 8 * rcx + 160] 
+  vmovapd ymm0, [rdi + 8 * rcx + 192] 
+  vmovapd ymm0, [rdi + 8 * rcx + 224] 
   ; each vmov loads 4 words
   add rcx, 32
   cmp rcx, rsi

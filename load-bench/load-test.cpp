@@ -135,25 +135,32 @@ int main(int argc, char ** argv)
 		exit(EXIT_FAILURE);
 	}
 	tab = (double *) ptrvoid;
-
-#else
-#ifdef USE_PADDING
-	//padding
-	tab = new double[param->globsiz + 8 + param->nbThread * var_padding];
-#else//USE_PADDING
-	tab = new double[param->globsiz + 8 ];
-#endif//USE_PADDING
-#endif //HUGE
-	if(tab == NULL)
-	{
-		cout << "could not allocate tab" << endl;
-		exit(EXIT_FAILURE);
-	}
 	//storing old value for freeing
 	double * oldtab = tab;
 	//aligning on 32 bytes for intrinsics and
 	//assembly constraint
 	tab = (double *)align_ptr((char *)tab, 32);
+
+#else
+#ifdef USE_PADDING
+	//padding
+	//tab = new double[param->globsiz + 8 + param->nbThread * var_padding];
+	int r = posix_memalign((void **) &tab, 32, param->globsiz * sizeof(double) + param->nbThread * var_padding * sizeof(double));
+	if (r < 0)
+	{
+	  printf("memalign failure\n");
+	  return -1;
+	}
+#else//USE_PADDING
+	//tab = new double[param->globsiz + 8 ];
+	int r = posix_memalign((void **) &tab, 32, param->globsiz * sizeof(double));
+	if (r != 0)
+	{
+	  printf("memalign failure\n");
+	  return -1;
+	}
+#endif//USE_PADDING
+#endif //HUGE
 #pragma omp for
 	for (size_t i = 0; i <  param->globsiz; i++)
 	{
@@ -301,13 +308,13 @@ int main(int argc, char ** argv)
 		{
 			CPU_ZERO(&sets[k]);
 			CPU_SET(param->fstThrList[k], &sets[k]);
-			printf("fast thread [%d] pinned on cpu %d\n", k, param->fstThrList[k]);
 			s = pthread_setaffinity_np(thrTab[k],sizeof(cpu_set_t), &sets[k]);
 			if (s != 0)
 			{
 				printf("could not set affinity\n");
 				exit(EXIT_FAILURE);
 			}
+			printf("fast thread [%d] pinned on cpu %d\n", k, param->fstThrList[k]);
 		}
 		
 	}
@@ -390,7 +397,7 @@ int main(int argc, char ** argv)
 	munmap((void *)oldtab, ((param->globsiz + 8) * sizeof(double) ));
 	//munmap((void *)oldtab, std::min((size_t)(1 << 27), ((param->globsiz + 8) * sizeof(double))));
 #else
-	free(oldtab);
+	free(tab);
 #endif
 	delete param;
 	return 0;
@@ -456,15 +463,6 @@ Throughput : %f %cB/s \n", time, cpu, args->size * sizeof(double),  args->niter,
 	return NULL;
 }
 
-//takes a pointer and returns it
-//rounded up on upper n bound
-//char * align_ptr(char * t, intptr_t n)
-//{
-//	intptr_t ptr;
-//	ptr = (intptr_t)(t + n) & ~(n - 1);
-//	return (char *)ptr;
-//}
-
 char * align_ptr(char * t, intptr_t n)
 {
 	intptr_t ptr = (intptr_t) t;
@@ -472,27 +470,3 @@ char * align_ptr(char * t, intptr_t n)
 	ptr = ((ptr % n == 0) ? ptr :(ptr + n) & ~(n - 1));
 	return (char *)ptr;
 }
-
-
-
-//inline unsigned long get_cycles()
-//{
-//	uint32_t eax = 0, edx;
-//
-//	__asm__ __volatile__(
-//			//get informations on cpu
-//			"cpuid;"
-//			// get timestamp since last reset
-//			"rdtsc;"
-//			: "+a" (eax), "=d" (edx)
-//			:
-//			: "%rcx", "%rbx", "memory");
-//
-//	__asm__ __volatile__("xorl %%eax, %%eax;"
-//			"cpuid;"
-//			:
-//			:
-//			: "%rax", "%rbx", "%rcx", "%rdx", "memory");
-//
-//	return (((uint64_t)edx << 32) | eax);
-//}

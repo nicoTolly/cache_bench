@@ -18,9 +18,11 @@ ld_vect:
 
 
 ; outer loop, loading array k times
+align 16
 .outer:
   ; rcx holds the number of words that have been loaded
   xor rcx,rcx
+align 16
 .inner:
   ; do 8 parallel loads
   ; hopefully this is enough to get rid of

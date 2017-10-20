@@ -1,15 +1,15 @@
 CC=g++
 AS=nasm
-DEBUG=yes
+DEBUG=
 HWLOC=yes
 HUGEPAGES=
-AVX=yes
+AVX=
 
 ifeq ($(DEBUG),yes)
-	CXXFLAGS=-Wall -g -std=c++11 -fopenmp -fpic   
+	CXXFLAGS=-Wall  -g -std=c++11 -fopenmp -fpic   
 	EXEC= load.db
 else
-	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -O3
+	CXXFLAGS=-Wall -std=c++11 -fpic -fopenmp -O2
 	EXEC= load
 endif
 
@@ -35,9 +35,9 @@ endif
 ifeq ($(AVX), yes)
 	CXXFLAGS+= -mavx
 	CXXFLAGS+= -DUSE_AVX
-	ASM_DIR=$(PROJECT_ROOT_DIR)/x86_avx
+	ASM_DIR=$(PROJECT_ROOT_DIR)/arch/x86_avx
 else
-	ASM_DIR=$(PROJECT_ROOT_DIR)/x86_sse
+	ASM_DIR=$(PROJECT_ROOT_DIR)/arch/x86_sse
 endif
 
 ASM_SRC= kernel.asm get_cycles.asm
@@ -46,13 +46,8 @@ PROJECT_ROOT_DIR= $(shell pwd)
 
 DEBUG_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(SRC:.cpp=.o))
 RELEASE_OBJECTS = $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(SRC:.cpp=.o))
-#DEBUG_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(ASM_SRC:.asm=.o))
-#RELEASE_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(ASM_SRC:.asm=.o))
-DEBUG_OBJECTS += $(PROJECT_ROOT_DIR)/debug_obj/kernel.o
-RELEASE_OBJECTS += $(PROJECT_ROOT_DIR)/release_obj/kernel.o
-DEBUG_OBJECTS += $(PROJECT_ROOT_DIR)/debug_obj/get_cycles.o
-RELEASE_OBJECTS += $(PROJECT_ROOT_DIR)/release_obj/get_cycles.o
-
+DEBUG_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/debug_obj/,$(ASM_SRC:.asm=.o))
+RELEASE_OBJECTS += $(addprefix $(PROJECT_ROOT_DIR)/release_obj/,$(ASM_SRC:.asm=.o))
 
 .PHONY: all
 .PHONY: debug
