@@ -13,7 +13,6 @@ ld_vect:
   push rdx
   ; Now stack is aligned
 
-  shl rsi, 1
   mov r10, rdx
 
 
